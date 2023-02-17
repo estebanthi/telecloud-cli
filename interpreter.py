@@ -34,3 +34,8 @@ class Interpreter(cmd.Cmd):
 
     def do_untag(self, args):
         self.commands_controller.untag(args)
+
+    def do_tags(self, args):
+        res = self.commands_controller.tags(args)
+        for tag in res:
+            print(tag)

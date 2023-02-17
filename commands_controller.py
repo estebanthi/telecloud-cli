@@ -165,3 +165,6 @@ class CommandsController:
     def untag_file(self, file_id, tags):
         print(f"Untagging {file_id}")
         requests.delete(f'{self.base_api_url}/files/{file_id}/tags', data={'tags': tags})
+
+    def tags(self, args):
+        return requests.get(self.base_api_url + "/tags").json()
