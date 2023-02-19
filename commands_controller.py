@@ -50,7 +50,9 @@ class CommandsController:
                 for file_name in file_names:
                     files.append(os.path.join(root, file_name))
             for file in tqdm.tqdm(files):
-                self.upload_file(file, args.tags or [])
+                res = self.upload_file(file, args.tags or [])
+                if res.get('error'):
+                    print(res['error'])
 
     def upload_file(self, file_path, tags):
         print(f"Uploading {file_path}")
