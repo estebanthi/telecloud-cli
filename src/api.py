@@ -42,3 +42,27 @@ class Api:
     def remove_tags(self, file_id, tags):
         res = requests.patch(f"{self.api_url}/files/{file_id}/meta/tags", data={"tags": tags})
         return res.status_code == 200
+
+    def rename(self, id_, new):
+        res = requests.get(f"{self.api_url}/files/{id_}")
+        if res.status_code == 200:
+            res = requests.patch(f"{self.api_url}/files/{id_}/meta", data={"name": new})
+            return res.status_code == 200
+
+        res = requests.get(f"{self.api_url}/directories/{id_}")
+        if res.status_code == 200:
+            res = requests.patch(f"{self.api_url}/directories/{id_}/meta", data={"name": new})
+            return res.status_code == 200
+
+        return False
+
+    def move(self, id_, new_parent_id):
+        res = requests.get(f"{self.api_url}/files/{id_}")
+        if res.status_code == 200:
+            res = requests.patch(f"{self.api_url}/files/{id_}/meta", data={"directory": new_parent_id})
+            return res.status_code == 200
+
+        res = requests.get(f"{self.api_url}/directories/{id_}")
+        if res.status_code == 200:
+            res = requests.patch(f"{self.api_url}/directories/{id_}/meta", data={"parent": new_parent_id})
+            return res.status_code == 200

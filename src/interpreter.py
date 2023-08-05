@@ -343,3 +343,68 @@ class Interpreter(cmd.Cmd):
             file_id = self.remote_files_structure[file]
             self.api.remove_tags(file_id, tags)
 
+    def do_rn(self, args):
+        parser = argparse.ArgumentParser()
+        parser.add_argument('old', help='Old file name.')
+        parser.add_argument('new', help='New file name.')
+        args = parser.parse_args(args.split())
+
+        old = utils.format_path(self.local_dir if self.mode == MODES.LOCAL else self.remote_dir, args.old)
+        new = utils.format_path(self.local_dir if self.mode == MODES.LOCAL else self.remote_dir, args.new)
+
+        if self.validate_rn(old, new):
+            self.rn(old, new)
+
+    def help_rn(self):
+        print("Rename a file.")
+        print("Usage: rn OLD NEW")
+        print("Note: OLD is the old name and NEW is the new name.")
+
+    def do_mv(self, args):
+        parser = argparse.ArgumentParser()
+        parser.add_argument('old', help='Old file path.')
+        parser.add_argument('new', help='New file path.')
+        args = parser.parse_args(args.split())
+
+        old = utils.format_path(self.local_dir if self.mode == MODES.LOCAL else self.remote_dir, args.old)
+        new = utils.format_path(self.local_dir if self.mode == MODES.LOCAL else self.remote_dir, args.new)
+
+        if self.validate_mv(old, new):
+            self.mv(old, new)
+
+    def help_mv(self):
+        print("Move a file.")
+        print("Usage: mv OLD NEW")
+        print("Note: OLD is the old path and NEW is the new path.")
+
+    def validate_mv(self, old, new):
+        structure = self.remote_files_structure | self.remote_folder_structure
+        if not utils.path_exists(old, self.mode, structure):
+            print(f"{old} does not exist.")
+            return False
+        if utils.path_exists(new, self.mode, structure):
+            print(f"{new} already exists.")
+            return False
+        return True
+
+    def mv(self, old, new):
+        if self.mode == MODES.LOCAL:
+            os.rename(old, new)
+        else:
+            structure = self.remote_files_structure | self.remote_folder_structure
+            id_ = structure[old]
+
+            is_rename = old.split('/')[-1] != new.split('/')[-1]
+            if is_rename:
+                self.api.rename(id_, new.split('/')[-1])
+
+            is_move = old.split('/')[:-1] != new.split('/')[:-1]
+            if is_move:
+                new_parent = '/'.join(new.split('/')[:-1])
+                if new_parent == '':
+                    new_parent = '/'
+                new_parent_id = structure[new_parent]
+                self.api.move(id_, new_parent_id)
+
+            self.remote_files_structure = self.api.get_remote_files_structure()
+            self.remote_folder_structure = self.api.get_remote_folder_structure()
