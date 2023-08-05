@@ -56,11 +56,13 @@ class CommandsController:
 
     def upload_file(self, file_path, tags):
         print(f"Uploading {file_path}")
+        file_path = "/home/estebanthilliez/Downloads/MickyBells - Boobs and dishes - ManyVids.mp4"
         file_size = int(os.path.getsize(file_path))
         file_type = file_path.split('.')[-1]
-        post_data = {'type': file_type, 'size': file_size, 'tags': tags}
-        files = {'file': open(file_path, 'rb')}
-        response = requests.post(self.base_api_url + "/upload", data=post_data, files=files)
+        post_data = {"data": [{'type': file_type, 'size': file_size, 'tags': tags}, {'type': file_type, 'size': "12", 'tags': tags}]}
+        files = [('file', open(file_path, 'rb')), ('file2', open(file_path, 'rb'))]
+        response = requests.post(self.base_api_url + "/files", data=post_data, files=files)
+        return "ok"
         return response.json()
 
     def download(self, args):
@@ -70,6 +72,7 @@ class CommandsController:
         parser.add_argument("--types")
         parser.add_argument("-o", "--output")
         args = parser.parse_args(args.split())
+
         return self.download_files(args.id, args.tags, args.types, args.output)
 
     def download_files(self, file_id, tags, file_types, output):
@@ -86,8 +89,9 @@ class CommandsController:
                 self.download_file(file['_id'], output)
 
     def download_file(self, file_id, output):
+
         print(f"Downloading {file_id}")
-        file_download = requests.get(f'{self.base_api_url}/download/{file_id}')
+        file_download = requests.get(f'{self.base_api_url}/files/download')
         file_name = file_download.headers['Content-Disposition'].split('filename=')[1]
         file_path = os.path.join(output or "./", file_name)
         with open(file_path, 'wb') as f:
