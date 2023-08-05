@@ -34,3 +34,11 @@ class Api:
     def delete_directory(self, directory_id):
         res = requests.delete(f"{self.api_url}/directories/{directory_id}?recursive=true")
         return res.status_code == 200
+
+    def add_tags(self, file_id, tags):
+        res = requests.post(f"{self.api_url}/files/{file_id}/meta/tags", data={"tags": tags})
+        return res.status_code == 200
+
+    def remove_tags(self, file_id, tags):
+        res = requests.patch(f"{self.api_url}/files/{file_id}/meta/tags", data={"tags": tags})
+        return res.status_code == 200
