@@ -40,6 +40,10 @@ def path_exists(path, mode, remote_path_structure):
 def get_directory_children(folder_structure, path):
     return [dir_path for dir_path in folder_structure if dir_path.startswith(path) and dir_path != path]
 
+
+def get_directory_parent(path):
+    return os.path.dirname(path)
+
 def flatten_list(l):
     return [item for sublist in l for item in sublist]
 

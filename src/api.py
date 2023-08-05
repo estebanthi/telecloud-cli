@@ -26,3 +26,11 @@ class Api:
         res = requests.get(f"{self.api_url}/directories/meta")
         directories = res.json() if res.status_code == 200 else []
         return directories
+
+    def create_directory(self, directory_name, parent_id):
+        res = requests.post(f"{self.api_url}/directories", data={"name": directory_name, "parent": parent_id})
+        return res.status_code == 200
+
+    def delete_directory(self, directory_id):
+        res = requests.delete(f"{self.api_url}/directories/{directory_id}?recursive=true")
+        return res.status_code == 200

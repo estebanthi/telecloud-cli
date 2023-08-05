@@ -3,6 +3,7 @@ import argparse
 from termcolor import colored
 import os
 import re
+import shutil
 
 from src.modes import MODES
 import src.utils as utils
@@ -161,35 +162,66 @@ class Interpreter(cmd.Cmd):
             self.local_dir = new_directory if self.mode == MODES.LOCAL else self.local_dir
             self.remote_dir = new_directory if self.mode == MODES.REMOTE else self.remote_dir
 
+    def help_cd(self):
+        print("Change directory.")
+        print("Usage: cd DIRECTORY")
+        print("Note: DIRECTORY can be either absolute or relative path.")
+
     def validate_cd(self, directory):
         if utils.path_exists(directory, self.mode, self.remote_folder_structure):
             return True
         print(f"Directory {directory} does not exist.")
 
-    def local_cd(self):
-        pass
+    def do_mkdir(self, directory):
+        directory = utils.format_path(self.local_dir if self.mode == MODES.LOCAL else self.remote_dir, directory)
+        if self.validate_mkdir(directory):
+            self.mkdir(directory)
 
-    def remote_cd(self):
-        pass
+    def help_mkdir(self):
+        print("Create directory.")
+        print("Usage: mkdir DIRECTORY")
+        print("Note: DIRECTORY can be either absolute or relative path.")
 
+    def validate_mkdir(self, directory):
+        if utils.path_exists(directory, self.mode, self.remote_folder_structure):
+            print(f"Directory {directory} already exists.")
+            return False
+        return True
 
-    def do_upload(self, args):
-        res = self.commands_controller.upload(args)
-        print("Upload successful")
+    def mkdir(self, directory):
+        if self.mode == MODES.LOCAL:
+            os.mkdir(directory)
+        else:
+            directory_parent = utils.get_directory_parent(directory)
+            if directory_parent not in self.remote_folder_structure:
+                print(f"Parent directory {directory_parent} does not exist.")
+                return
 
-    def do_download(self, args):
-        self.commands_controller.download(args)
+            parent_id = self.remote_folder_structure[directory_parent]
+            directory_name = directory.split('/')[-1]
+            self.api.create_directory(directory_name, parent_id)
+            self.remote_folder_structure = self.api.get_remote_folder_structure()
 
-    def do_rm(self, args):
-        self.commands_controller.rm(args)
+    def do_rmdir(self, directory):
+        directory = utils.format_path(self.local_dir if self.mode == MODES.LOCAL else self.remote_dir, directory)
+        if self.validate_rmdir(directory):
+            self.rmdir(directory)
 
-    def do_tag(self, args):
-        self.commands_controller.tag(args)
+    def help_rmdir(self):
+        print("Remove directory.")
+        print("Usage: rmdir DIRECTORY")
+        print("Note: DIRECTORY can be either absolute or relative path.")
 
-    def do_untag(self, args):
-        self.commands_controller.untag(args)
+    def validate_rmdir(self, directory):
+        if not utils.path_exists(directory, self.mode, self.remote_folder_structure):
+            print(f"Directory {directory} does not exist.")
+            return False
+        return True
 
-    def do_tags(self, args):
-        res = self.commands_controller.tags(args)
-        for tag in res:
-            print(tag)
+    def rmdir(self, directory):
+        if self.mode == MODES.LOCAL:
+            shutil.rmtree(directory)
+        else:
+            directory_id = self.remote_folder_structure[directory]
+            self.api.delete_directory(directory_id)
+            self.remote_folder_structure = self.api.get_remote_folder_structure()
