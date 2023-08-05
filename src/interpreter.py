@@ -2,9 +2,7 @@ import cmd
 import argparse
 from termcolor import colored
 import os
-import shutil
 import re
-import requests
 
 from src.modes import MODES
 import src.utils as utils
@@ -30,7 +28,8 @@ class Interpreter(cmd.Cmd):
         self.prompt = self.get_prompt()
 
     def get_prompt(self):
-        return f"[ {colored(self.local_dir, 'green') if self.mode == MODES.LOCAL else self.local_dir} | {colored(self.remote_dir, 'green') if self.mode == MODES.REMOTE else self.remote_dir} ]$ "
+        selected_color = 'yellow'
+        return f"[ {colored(self.local_dir, selected_color) if self.mode == MODES.LOCAL else self.local_dir} || {colored(self.remote_dir, selected_color) if self.mode == MODES.REMOTE else self.remote_dir} ]$ "
 
     def update_prompt(self):
         self.prompt = self.get_prompt()
@@ -129,7 +128,9 @@ class Interpreter(cmd.Cmd):
         directories = [] if args.all else (args.directories or [self.remote_dir])
         directories = utils.format_paths(self.remote_dir, directories)
 
-        files = self.api.get_files_meta(tags, directories)
+        directories_ids = [self.remote_folder_structure[directory] for directory in directories if directory in self.remote_folder_structure]
+
+        files = self.api.get_files_meta(tags, directories_ids)
 
         directories_ = []
         if args.all:
@@ -140,10 +141,9 @@ class Interpreter(cmd.Cmd):
                 children = [child.replace(f'{directory}', '', 1) for child in children]  # replacing base path
                 children = [child[1:] if child.startswith('/') else child for child in children]  # removing leading '/' if existing
                 children = [child.split('/')[0] if '/' in child else child for child in children]  # keep only the first part of the path
-                print(children)
                 children = utils.remove_dupes(children)
                 directories_ += children
-            directories_ = utils.remove_dupes(directories)
+            directories_ = utils.remove_dupes(directories_)
 
         entities = []
         for file in files:
@@ -153,11 +153,18 @@ class Interpreter(cmd.Cmd):
 
         return entities
 
-    def do_cd(self, args):
-        if self.mode == MODES.LOCAL:
-            self.local_cd()
-        else:
-            self.remote_cd()
+    @update_prompt_decorator
+    def do_cd(self, directory):
+        current_path = self.local_dir if self.mode == MODES.LOCAL else self.remote_dir
+        new_directory = utils.format_path(current_path, directory)
+        if self.validate_cd(new_directory):
+            self.local_dir = new_directory if self.mode == MODES.LOCAL else self.local_dir
+            self.remote_dir = new_directory if self.mode == MODES.REMOTE else self.remote_dir
+
+    def validate_cd(self, directory):
+        if utils.path_exists(directory, self.mode, self.remote_folder_structure):
+            return True
+        print(f"Directory {directory} does not exist.")
 
     def local_cd(self):
         pass

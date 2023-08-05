@@ -21,6 +21,12 @@ def format_paths(cur_path, paths):
 
 
 def format_path(cur_path, path):
+    if path == '.':
+        return cur_path
+    if path == '..':
+        return os.path.dirname(cur_path)
+    if path == '~':
+        return os.path.expanduser('~')
     path = path if path.startswith('/') else os.path.join(cur_path, path)
     return path[:-1] if path.endswith('/') and len(path) > 1 else path
 
