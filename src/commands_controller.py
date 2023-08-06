@@ -56,7 +56,6 @@ class CommandsController:
 
     def upload_file(self, file_path, tags):
         print(f"Uploading {file_path}")
-        file_path = "/home/estebanthilliez/Downloads/MickyBells - Boobs and dishes - ManyVids.mp4"
         file_size = int(os.path.getsize(file_path))
         file_type = file_path.split('.')[-1]
         post_data = {"data": [{'type': file_type, 'size': file_size, 'tags': tags}, {'type': file_type, 'size': "12", 'tags': tags}]}

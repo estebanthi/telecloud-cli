@@ -56,8 +56,8 @@ class Interpreter(cmd.Cmd):
 
     def do_ls(self, args):
         parser = argparse.ArgumentParser()
+        parser.add_argument('directories', type=str, nargs='*')
         parser.add_argument('-t', "--tags", type=str, nargs='+', required=False)
-        parser.add_argument('-d', "--directories", type=str, nargs='+', required=False)
         parser.add_argument('-r', "--regex", type=str, required=False)
         parser.add_argument('-a', "--all", action='store_true', required=False)
         args = parser.parse_args(args.split())
@@ -76,11 +76,10 @@ class Interpreter(cmd.Cmd):
 
     def help_ls(self):
         print("List files and directories.")
-        print("Usage: ls [-t TAGS] [-d DIRECTORIES] [-r REGEX] [-a]")
+        print("Usage: ls DIRECTORIES [-t TAGS] [-r REGEX] [-a]")
         print("If no options are specified, all files and directories in current directory are listed.")
         print("Options:")
         print("  -t, --tags TAGS\t\t\tList files with specified tags.")
-        print("  -d, --directories DIRECTORIES\t\tList files and directories in specified directories.")
         print("  -r, --regex REGEX\t\t\tList files and directories with names matching specified regex.")
         print("  -a, --all\t\t\t\tList all files and directories.")
         print("Note: If multiple options are specified, only files and directories that satisfy all options are listed.")
@@ -408,3 +407,69 @@ class Interpreter(cmd.Cmd):
 
             self.remote_files_structure = self.api.get_remote_files_structure()
             self.remote_folder_structure = self.api.get_remote_folder_structure()
+
+    def do_upload(self, args):
+        parser = argparse.ArgumentParser()
+        parser.add_argument('files', nargs='*', help='Files to be uploaded.')
+        parser.add_argument('-to', '--to', help='Directory to upload the files to.', default='/')
+        parser.add_argument('-d', '--directories', nargs='+', help='Directories to be uploaded.', default=[])
+        parser.add_argument('-t', '--tags', nargs='+', help='Tags to be added to the files.', default=[])
+        parser.add_argument('-r', '--regex', help='Regex to filter files.')
+        args = parser.parse_args(args.split())
+
+        if self.validate_upload(args):
+            self.upload(args)
+
+    def help_upload(self):
+        print("Upload files.")
+        print("Usage: upload [OPTIONS] FILES")
+        print("Note: FILES are the files to be uploaded.")
+        print("Options:")
+        print("  -d, --directories TEXT  Directories to be uploaded.")
+        print("  -t, --tags TEXT         Tags to be added to the files.")
+        print("  -r, --regex TEXT        Regex to filter files.")
+
+    def validate_upload(self, args):
+        if args.directories:
+            args.directories = utils.format_paths(self.local_dir, args.directories)
+            for directory in args.directories:
+                if not utils.path_exists(directory, MODES.LOCAL, self.remote_folder_structure):
+                    print(f"Directory {directory} does not exist.")
+                    return False
+        if args.files:
+            args.files = utils.format_paths(self.local_dir, args.files)
+            for file in args.files:
+                if not utils.path_exists(file, MODES.LOCAL, self.remote_folder_structure):
+                    print(f"File {file} does not exist.")
+                    return False
+        if args.to:
+            args.to = utils.format_path(self.remote_dir, args.to)
+            if not utils.path_exists(args.to, MODES.REMOTE, self.remote_folder_structure):
+                print(f"Directory {args.to} does not exist in the remote.")
+                return False
+        return True
+
+    def upload(self, args):
+        directories = args.directories if args.directories else []
+        files = args.files if args.files else []
+        to = self.remote_folder_structure[args.to]
+        tags = args.tags
+        regex = args.regex
+
+        directories = utils.format_paths(self.local_dir, directories)
+        files = utils.format_paths(self.local_dir, files)
+
+        for directory in directories:
+            for root, dirs, files_ in os.walk(directory):
+                for file in files_:
+                    path = os.path.join(root, file)
+                    files.append(path)
+
+        if regex:
+            files = [file for file in files if re.search(regex, file)]
+
+        for file in files:
+            self.api.upload(file, to, tags)
+
+        self.remote_files_structure = self.api.get_remote_files_structure()
+        self.remote_folder_structure = self.api.get_remote_folder_structure()

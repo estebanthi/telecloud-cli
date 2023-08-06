@@ -1,5 +1,7 @@
 import requests
 import src.utils as utils
+import mimetypes
+import os
 
 
 class Api:
@@ -66,3 +68,14 @@ class Api:
         if res.status_code == 200:
             res = requests.patch(f"{self.api_url}/directories/{id_}/meta", data={"parent": new_parent_id})
             return res.status_code == 200
+
+    def upload(self, file, directory_id, tags):
+        file_path = file
+        file_size = int(os.path.getsize(file_path))
+        file_type = mimetypes.guess_type(file_path)[0]
+        post_data = {"data": [{'size': file_size, 'tags': tags, 'directory': directory_id}]}
+        if file_type:
+            post_data["data"][0]['type'] = file_type
+        files = [('files', open(file_path, 'rb'))]
+        response = requests.post(f'{self.api_url}/files', data=post_data, files=files)
+        return response.status_code == 200
