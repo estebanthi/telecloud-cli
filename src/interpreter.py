@@ -135,7 +135,7 @@ class Interpreter(cmd.Cmd):
         directories_ = []
         if args.all:
             directories_ = [directory for directory in self.remote_folder_structure]
-        else:
+        elif not tags:
             for directory in directories:
                 children = utils.get_directory_children(self.remote_folder_structure, directory)
                 children = [child.replace(f'{directory}', '', 1) for child in children]  # replacing base path
@@ -342,22 +342,6 @@ class Interpreter(cmd.Cmd):
             file_id = self.remote_files_structure[file]
             self.api.remove_tags(file_id, tags)
 
-    def do_rn(self, args):
-        parser = argparse.ArgumentParser()
-        parser.add_argument('old', help='Old file name.')
-        parser.add_argument('new', help='New file name.')
-        args = parser.parse_args(args.split())
-
-        old = utils.format_path(self.local_dir if self.mode == MODES.LOCAL else self.remote_dir, args.old)
-        new = utils.format_path(self.local_dir if self.mode == MODES.LOCAL else self.remote_dir, args.new)
-
-        if self.validate_rn(old, new):
-            self.rn(old, new)
-
-    def help_rn(self):
-        print("Rename a file.")
-        print("Usage: rn OLD NEW")
-        print("Note: OLD is the old name and NEW is the new name.")
 
     def do_mv(self, args):
         parser = argparse.ArgumentParser()
