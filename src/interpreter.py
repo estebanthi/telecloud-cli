@@ -395,7 +395,7 @@ class Interpreter(cmd.Cmd):
     def do_upload(self, args):
         parser = argparse.ArgumentParser()
         parser.add_argument('files', nargs='*', help='Files to be uploaded.')
-        parser.add_argument('-to', '--to', help='Directory to upload the files to.', default='/')
+        parser.add_argument('-to', '--to', help='Directory to upload the files to.')
         parser.add_argument('-d', '--directories', nargs='+', help='Directories to be uploaded.', default=[])
         parser.add_argument('-t', '--tags', nargs='+', help='Tags to be added to the files.', default=[])
         parser.add_argument('-r', '--regex', help='Regex to filter files.')
@@ -436,7 +436,7 @@ class Interpreter(cmd.Cmd):
     def upload(self, args):
         directories = args.directories if args.directories else []
         files = args.files if args.files else []
-        to = self.remote_folder_structure[args.to]
+        to = self.remote_folder_structure[args.to if args.to else self.remote_dir]
         tags = args.tags
         regex = args.regex
 
@@ -457,3 +457,62 @@ class Interpreter(cmd.Cmd):
 
         self.remote_files_structure = self.api.get_remote_files_structure()
         self.remote_folder_structure = self.api.get_remote_folder_structure()
+
+    def do_download(self, args):
+        parser = argparse.ArgumentParser()
+        parser.add_argument('files', nargs='*', help='Files to be downloaded.')
+        parser.add_argument('-to', '--to', help='Directory to download the files to.')
+        parser.add_argument('-d', '--directories', nargs='+', help='Directories to be downloaded.', default=[])
+        parser.add_argument('-r', '--regex', help='Regex to filter files.')
+        args = parser.parse_args(args.split())
+
+        if self.validate_download(args):
+            self.download(args)
+
+    def help_download(self):
+        print("Download files.")
+        print("Usage: download [OPTIONS] FILES")
+        print("Note: FILES are the files to be downloaded.")
+        print("Options:")
+        print("  -d, --directories TEXT  Directories to be downloaded.")
+        print("  -r, --regex TEXT        Regex to filter files.")
+
+    def validate_download(self, args):
+        if args.directories:
+            args.directories = utils.format_paths(self.remote_dir, args.directories)
+            for directory in args.directories:
+                if not utils.path_exists(directory, MODES.REMOTE, self.remote_folder_structure):
+                    print(f"Directory {directory} does not exist.")
+                    return False
+        if args.files:
+            args.files = utils.format_paths(self.remote_dir, args.files)
+            for file in args.files:
+                if not utils.path_exists(file, MODES.REMOTE, self.remote_files_structure):
+                    print(f"File {file} does not exist.")
+                    return False
+        if args.to:
+            args.to = utils.format_path(self.local_dir, args.to)
+            if not utils.path_exists(args.to, MODES.LOCAL, self.remote_folder_structure):
+                print(f"Directory {args.to} does not exist in the local.")
+                return False
+        return True
+
+    def download(self, args):
+        directories = args.directories if args.directories else []
+        files = args.files if args.files else []
+        to = args.to if args.to else self.local_dir
+        regex = args.regex
+
+        directories = utils.format_paths(self.remote_dir, directories)
+        files = utils.format_paths(self.remote_dir, files)
+
+        for directory in directories:
+            files_to_download = [file for file in self.remote_files_structure if file.startswith(directory)]
+            files.extend(files_to_download)
+
+        if regex:
+            files = [file for file in files if re.search(regex, file[0])]
+
+        files = [self.remote_files_structure[file] for file in files]
+        for file in files:
+            self.api.download(file, to)

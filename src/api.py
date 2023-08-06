@@ -79,3 +79,13 @@ class Api:
         files = [('files', open(file_path, 'rb'))]
         response = requests.post(f'{self.api_url}/files', data=post_data, files=files)
         return response.status_code == 200
+
+    def download(self, file_id, to):
+        response = requests.get(f'{self.api_url}/files/{file_id}', stream=True)
+        if response.status_code == 200:
+            attachment_filename = response.headers['Content-Disposition'].split('filename=')[1]
+            with open(os.path.join(to, attachment_filename), 'wb') as f:
+                for chunk in response.iter_content(1024):
+                    f.write(chunk)
+            return True
+        return False
