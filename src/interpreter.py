@@ -490,6 +490,9 @@ class Interpreter(cmd.Cmd):
                 if not utils.path_exists(file, MODES.REMOTE, self.remote_files_structure):
                     print(f"File {file} does not exist.")
                     return False
+                if utils.path_exists(file, MODES.LOCAL, self.remote_files_structure):
+                    print(f"File {file} already exists in the local.")
+                    return False
         if args.to:
             args.to = utils.format_path(self.local_dir, args.to)
             if not utils.path_exists(args.to, MODES.LOCAL, self.remote_folder_structure):
@@ -516,3 +519,49 @@ class Interpreter(cmd.Cmd):
         files = [self.remote_files_structure[file] for file in files]
         for file in files:
             self.api.download(file, to)
+
+    def do_rm(self, args):
+        parser = argparse.ArgumentParser()
+        parser.add_argument('files', nargs='+', help='Files to be removed.')
+        parser.add_argument('-r', '--regex', help='Regex to filter files.')
+        args = parser.parse_args(args.split())
+
+        if self.validate_rm(args):
+            self.rm(args)
+
+    def help_rm(self):
+        print("Remove files.")
+        print("Usage: rm [OPTIONS] FILES")
+        print("Note: FILES are the files to be removed.")
+        print("Options:")
+        print("  -d, --directories TEXT  Directories to be removed.")
+        print("  -r, --regex TEXT        Regex to filter files.")
+
+    def validate_rm(self, args):
+        args.files = utils.format_paths(self.local_dir if self.mode == MODES.LOCAL else self.remote_dir, args.files)
+        for file in args.files:
+            if not utils.path_exists(file, self.mode, self.remote_files_structure):
+                print(f"File {file} does not exist.")
+                return False
+        return True
+
+    def rm(self, args):
+        if self.mode == MODES.LOCAL:
+            for file in args.files:
+                os.remove(file)
+        else:
+            files = args.files
+            regex = args.regex
+
+            files = utils.format_paths(self.local_dir if self.mode == MODES.LOCAL else self.remote_dir, files)
+
+            if regex:
+                files = [file for file in files if re.search(regex, file)]
+
+            for file in files:
+                file_id = self.remote_files_structure[file]
+                self.api.rm(file_id)
+
+            self.remote_files_structure = self.api.get_remote_files_structure()
+            self.remote_folder_structure = self.api.get_remote_folder_structure()
+

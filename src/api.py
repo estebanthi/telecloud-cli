@@ -2,6 +2,8 @@ import requests
 import src.utils as utils
 import mimetypes
 import os
+from tqdm import tqdm
+
 
 
 class Api:
@@ -71,21 +73,34 @@ class Api:
 
     def upload(self, file, directory_id, tags):
         file_path = file
-        file_size = int(os.path.getsize(file_path))
+        file_size = os.path.getsize(file_path)
         file_type = mimetypes.guess_type(file_path)[0]
         post_data = {"data": [{'size': file_size, 'tags': tags, 'directory': directory_id}]}
         if file_type:
             post_data["data"][0]['type'] = file_type
         files = [('files', open(file_path, 'rb'))]
-        response = requests.post(f'{self.api_url}/files', data=post_data, files=files)
+
+        response = requests.post(
+                f'{self.api_url}/files',
+                data=post_data,
+                files=files,
+        )
+
         return response.status_code == 200
+
 
     def download(self, file_id, to):
         response = requests.get(f'{self.api_url}/files/{file_id}', stream=True)
         if response.status_code == 200:
             attachment_filename = response.headers['Content-Disposition'].split('filename=')[1]
             with open(os.path.join(to, attachment_filename), 'wb') as f:
-                for chunk in response.iter_content(1024):
-                    f.write(chunk)
+                with tqdm(total=int(response.headers['Content-Length']), unit='B', unit_scale=True, desc='Downloading', ncols=80) as pbar:
+                    for chunk in response.iter_content(chunk_size=1024):
+                        f.write(chunk)
+                        pbar.update(len(chunk))
             return True
         return False
+
+    def rm(self, file_id):
+        response = requests.delete(f'{self.api_url}/files/{file_id}')
+        return response.status_code == 200
