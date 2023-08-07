@@ -8,6 +8,7 @@ import shutil
 from src.modes import MODES
 import src.utils as utils
 from src.api import Api
+from src.filesystems import LocalFileSystem, RemoteFileSystem
 
 
 class Interpreter(cmd.Cmd):
@@ -21,16 +22,14 @@ class Interpreter(cmd.Cmd):
 
         self.mode = default_mode
 
-        self.local_dir = os.path.expanduser('~')
-        self.remote_dir = '/'
-        self.remote_folder_structure = self.api.get_remote_folder_structure()
-        self.remote_files_structure = self.api.get_remote_files_structure()
+        self.local_filesystem = LocalFileSystem()
+        self.remote_filesystem = RemoteFileSystem()
 
         self.prompt = self.get_prompt()
 
     def get_prompt(self):
         selected_color = 'yellow'
-        return f"[ {colored(self.local_dir, selected_color) if self.mode == MODES.LOCAL else self.local_dir} || {colored(self.remote_dir, selected_color) if self.mode == MODES.REMOTE else self.remote_dir} ]$ "
+        return f"[ {colored(self.local_filesystem.current, selected_color) if self.mode == MODES.LOCAL else self.local_filesystem.current} || {colored(self.remote_filesystem.current, selected_color) if self.mode == MODES.REMOTE else self.remote_filesystem.current} ]$ "
 
     def update_prompt(self):
         self.prompt = self.get_prompt()
@@ -54,25 +53,41 @@ class Interpreter(cmd.Cmd):
     def help_sw(self):
         print("Switch between local and remote mode.")
 
+    def validate_path(self, path, filesystem=None, should_exist=True):
+        filesystem = filesystem or self.local_filesystem if self.mode == MODES.LOCAL else self.remote_filesystem
+
+        if should_exist and not filesystem.exists(path):
+            print(f"Path {path} does not exist.")
+            return False
+        elif not should_exist and filesystem.exists(path):
+            print(f"Path {path} already exists.")
+            return False
+        return True
+
+    def validate_paths(self, paths, filesystem=None, should_exist=True):
+        for path in paths:
+            if not self.validate_path(path, filesystem, should_exist):
+                return False
+        return True
+
     def do_ls(self, args):
         parser = argparse.ArgumentParser()
         parser.add_argument('directories', type=str, nargs='*')
         parser.add_argument('-t', "--tags", type=str, nargs='+', required=False)
-        parser.add_argument('-r', "--regex", type=str, required=False)
-        parser.add_argument('-a', "--all", action='store_true', required=False)
+        parser.add_argument('-r', '--recursive', action='store_true', required=False)
+        parser.add_argument('-re', "--regex", type=str, required=False)
         args = parser.parse_args(args.split())
 
-        if self.validate_ls(args, self.mode):
-            self.ls(args, self.mode)
+        if self.validate_ls(args):
+            self.ls(args)
 
-    def validate_ls(self, args, mode):
-        directories = utils.format_paths(self.local_dir if mode == MODES.LOCAL else self.remote_dir, args.directories or [])
-        for directory in directories:
-            if not utils.path_exists(directory, mode, self.remote_folder_structure):
-                print(f"Directory {directory} does not exist.")
-                return False
+    def validate_ls(self, args):
+        filesystem = self.local_filesystem if self.mode == MODES.LOCAL else self.remote_filesystem
+        directories = args.directories or [filesystem.current]
+
+        if not self.validate_paths(directories, should_exist=True):
+            return False
         return True
-
 
     def help_ls(self):
         print("List files and directories.")
@@ -84,82 +99,36 @@ class Interpreter(cmd.Cmd):
         print("  -a, --all\t\t\t\tList all files and directories.")
         print("Note: If multiple options are specified, only files and directories that satisfy all options are listed.")
 
-    def ls(self, args, mode):
-        entities = self.get_local_entities(args) if mode == MODES.LOCAL else self.get_remote_entities(args)
-        entities = utils.remove_dupes(entities)
+    def ls(self, args):
+        filesystem = self.local_filesystem if self.mode == MODES.LOCAL else self.remote_filesystem
 
-        regex = args.regex
-        if regex:
-            entities = [(entity[0], entity[1]) for entity in entities if re.search(regex, entity[0])]
-
-        for entity in entities:
-            self.print_entity(entity)
-
-    def print_entity(self, entity):
-        if entity[1] == 'directory':
-            print(colored(entity[0], 'blue'))
-        else:
-            print(entity[0])
-
-    def get_local_entities(self, args):
-        entities = []
-
-        directories = args.directories or [self.local_dir]
-        directories = utils.format_paths(self.local_dir, directories)
-        for directory in directories:
-            entities.append(self.get_local_directory(directory))
-
-        entities = utils.flatten_list(entities)
-        return entities
-
-    def get_local_directory(self, directory):
-        entities = []
-
-        for file in os.listdir(directory):
-            if os.path.isdir(os.path.join(directory, file)):
-                entities.append((file, 'directory'))
-            else:
-                entities.append((file, 'file'))
-
-        return entities
-
-    def get_remote_entities(self, args):
         tags = args.tags or []
-        directories = [] if args.all else (args.directories or [self.remote_dir])
-        directories = utils.format_paths(self.remote_dir, directories)
+        directories = args.directories or [filesystem.current]
+        regex = args.regex or None
+        recursive = args.recursive or False
 
-        directories_ids = [self.remote_folder_structure[directory] for directory in directories if directory in self.remote_folder_structure]
+        files = filesystem.get_files(directories, regex, recursive, tags)
+        directories_ = filesystem.get_directories(directories, regex, recursive)
 
-        files = self.api.get_files_meta(tags, directories_ids)
+        filenames = [filesystem.basename(file) for file in files]
+        directory_names = [filesystem.basename(directory) for directory in directories_]
 
-        directories_ = []
-        if args.all:
-            directories_ = [directory for directory in self.remote_folder_structure]
-        elif not tags:
-            for directory in directories:
-                children = utils.get_directory_children(self.remote_folder_structure, directory)
-                children = [child.replace(f'{directory}', '', 1) for child in children]  # replacing base path
-                children = [child[1:] if child.startswith('/') else child for child in children]  # removing leading '/' if existing
-                children = [child.split('/')[0] if '/' in child else child for child in children]  # keep only the first part of the path
-                children = utils.remove_dupes(children)
-                directories_ += children
-            directories_ = utils.remove_dupes(directories_)
+        for filename in filenames:
+            self.print_file(filename)
 
-        entities = []
-        for file in files:
-            entities.append((file['name'], 'file'))
-        for directory in directories_:
-            entities.append((directory, 'directory'))
+        for directory_name in directory_names:
+            self.print_directory(directory_name)
 
-        return entities
+    def print_file(self, file):
+        print(file)
+
+    def print_directory(self, directory):
+        print(colored(directory, 'blue'))
 
     @update_prompt_decorator
     def do_cd(self, directory):
-        current_path = self.local_dir if self.mode == MODES.LOCAL else self.remote_dir
-        new_directory = utils.format_path(current_path, directory)
-        if self.validate_cd(new_directory):
-            self.local_dir = new_directory if self.mode == MODES.LOCAL else self.local_dir
-            self.remote_dir = new_directory if self.mode == MODES.REMOTE else self.remote_dir
+        if self.validate_cd(directory):
+            self.cd(directory)
 
     def help_cd(self):
         print("Change directory.")
@@ -167,12 +136,19 @@ class Interpreter(cmd.Cmd):
         print("Note: DIRECTORY can be either absolute or relative path.")
 
     def validate_cd(self, directory):
-        if utils.path_exists(directory, self.mode, self.remote_folder_structure):
-            return True
-        print(f"Directory {directory} does not exist.")
+        filesystem = self.local_filesystem if self.mode == MODES.LOCAL else self.remote_filesystem
+        new_directory = filesystem.format_path(directory)
+        if not filesystem.isdir(new_directory):
+            print(f"Path {directory} does not exist or is not a directory.")
+            return False
+        return True
+
+    def cd(self, directory):
+        filesystem = self.local_filesystem if self.mode == MODES.LOCAL else self.remote_filesystem
+        new_directory = filesystem.format_path(directory)
+        filesystem.current = new_directory
 
     def do_mkdir(self, directory):
-        directory = utils.format_path(self.local_dir if self.mode == MODES.LOCAL else self.remote_dir, directory)
         if self.validate_mkdir(directory):
             self.mkdir(directory)
 
@@ -182,7 +158,9 @@ class Interpreter(cmd.Cmd):
         print("Note: DIRECTORY can be either absolute or relative path.")
 
     def validate_mkdir(self, directory):
-        if utils.path_exists(directory, self.mode, self.remote_folder_structure):
+        filesystem = self.local_filesystem if self.mode == MODES.LOCAL else self.remote_filesystem
+        new_directory = filesystem.format_path(directory)
+        if filesystem.exists(new_directory):
             print(f"Directory {directory} already exists.")
             return False
         return True
