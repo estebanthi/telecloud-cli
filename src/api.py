@@ -10,6 +10,15 @@ class Api:
     def __init__(self, api_url):
         self.api_url = api_url
 
+        try:
+            self.test_connection()
+        except requests.exceptions.ConnectionError:
+            raise ConnectionError("Connection to the server could not be established")
+
+    def test_connection(self):
+        response = requests.get(f"{self.api_url}")
+        return response.status_code == 200
+
     def get_remote_folder_structure(self):
         response = requests.get(f"{self.api_url}/structure/directories")
         return response.json()

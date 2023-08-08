@@ -3,11 +3,12 @@ import argparse
 from termcolor import colored
 import os
 import re
-import shutil
+import logging
 
 from src.modes import MODES
 from src.api import Api
 from src.filesystems import LocalFileSystem, RemoteFileSystem, FileSystemConnector
+import src.colors as colors
 
 
 class Interpreter(cmd.Cmd):
@@ -18,10 +19,22 @@ class Interpreter(cmd.Cmd):
         self.local_filesystem = None
         self.mode = None
         self.api = None
+        self.logger = None
         self.configure(api_url, default_mode)
 
     def configure(self, api_url, default_mode=MODES.LOCAL):
-        self.api = Api(api_url)
+        self.logger = logging.getLogger('app')
+        self.logger.setLevel(logging.INFO)
+        self.logger.info(f"Logging level set to {logging.getLevelName(self.logger.level)}")
+
+        self.logger.info(f"Connecting to {api_url}")
+        try:
+            self.api = Api(api_url)
+        except Exception as e:
+            self.logger.error(f"Failed to connect to {api_url}")
+            self.logger.error(e)
+            exit(1)
+        self.logger.info(f"Connected to {api_url} - Starting interpreter")
 
         self.mode = default_mode
 
@@ -47,10 +60,24 @@ class Interpreter(cmd.Cmd):
         return self.local_filesystem if self.mode == MODES.LOCAL else self.remote_filesystem
 
     def run(self):
-        self.cmdloop("\n--- Telecloud CLI - Type help or ? to list commands. ---\n")
+        self.cmdloop('\n' + colors.light_theme("Welcome to Telecloud CLI!", randomize=True) + '\n' + 'Type help or ? to list commands.\n')
 
     def do_exit(self, args):
         return -1
+
+    def help_exit(self):
+        print("Exit the interpreter.")
+
+    def do_lg(self, args):
+        if self.logger.level == logging.INFO:
+            self.logger.info("Logging level will be set to ERROR.")
+            self.logger.setLevel(logging.ERROR)
+        else:
+            self.logger.setLevel(logging.INFO)
+            self.logger.info("Logging level set to INFO.")
+
+    def help_lg(self):
+        print("Toggle logging level between INFO and ERROR.")
 
     @update_prompt_decorator
     def do_sw(self, args):
@@ -63,10 +90,10 @@ class Interpreter(cmd.Cmd):
         filesystem = filesystem or self.get_filesystem()
 
         if should_exist and not filesystem.exists(path):
-            print(f"Path {path} does not exist.")
+            self.logger.error(f"Path {path} does not exist.")
             return False
         elif not should_exist and filesystem.exists(path):
-            print(f"Path {path} already exists.")
+            self.logger.error(f"Path {path} already exists.")
             return False
         return True
 
@@ -83,7 +110,7 @@ class Interpreter(cmd.Cmd):
             return False
 
         if not filesystem.isdir(path):
-            print(f"Path {path} is not a directory.")
+            self.logger.error(f"Path {path} is not a directory.")
             return False
         return True
 
@@ -100,7 +127,7 @@ class Interpreter(cmd.Cmd):
             return False
 
         if not filesystem.isfile(path):
-            print(f"Path {path} is not a file.")
+            self.logger.error(f"Path {path} is not a file.")
             return False
         return True
 
@@ -129,7 +156,7 @@ class Interpreter(cmd.Cmd):
             return False
 
         if args.tags and self.mode == MODES.LOCAL:
-            print("Tags are only available in remote mode.")
+            self.logger.error("Tags are only available in remote mode.")
             return False
 
         return True
@@ -213,7 +240,7 @@ class Interpreter(cmd.Cmd):
         filesystem = self.get_filesystem()
 
         if not filesystem.isempty(directory):
-            print(f"Directory {directory} is not empty.")
+            self.logger.error(f"Directory {directory} is not empty.")
             return False
 
         return self.validate_directory(directory, filesystem, should_exist=True)
@@ -285,11 +312,11 @@ class Interpreter(cmd.Cmd):
             return False
 
         if old_is_file and new_is_file:
-            print(f"Cannot move a file to another file.")
+            self.logger.error(f"Cannot move a file to another file.")
             return False
 
         if not old_is_file and new_is_file:
-            print(f"Cannot move a directory to a file.")
+            self.logger.error(f"Cannot move a directory to a file.")
             return False
 
         if not new_is_file:
@@ -333,7 +360,7 @@ class Interpreter(cmd.Cmd):
         directories = args.directories or []
 
         if self.mode == MODES.LOCAL:
-            print("Cannot tag files in local mode.")
+            self.logger.error("Cannot tag files in local mode.")
             return False
 
         return self.validate_files(files, should_exist=True) and self.validate_directories(directories, should_exist=True)
@@ -376,7 +403,7 @@ class Interpreter(cmd.Cmd):
         directories = args.directories or []
 
         if self.mode == MODES.LOCAL:
-            print("Cannot untag files in local mode.")
+            self.logger.error("Cannot untag files in local mode.")
             return False
 
         return self.validate_files(files, should_exist=True) and self.validate_directories(directories, should_exist=True)
@@ -427,12 +454,12 @@ class Interpreter(cmd.Cmd):
             return False
 
         if not self.remote_filesystem.exists(to):
-            print("Directory '{}' does not exist.".format(args.to))
+            self.logger.error("Directory '{}' does not exist.".format(args.to))
             return False
 
         for file in files:
             if self.remote_filesystem.exists(os.path.join(to, os.path.basename(file))):
-                print("File '{}' already exists.".format(file))
+                self.logger.error("File '{}' already exists.".format(file))
                 return False
 
         return True

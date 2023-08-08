@@ -1,6 +1,7 @@
 import re
 from abc import ABC, abstractmethod
 import os
+import logging
 
 
 class FileSystem(ABC):
@@ -8,6 +9,7 @@ class FileSystem(ABC):
     def __init__(self, root):
         self._root = root
         self._current = root
+        self.logger = logging.getLogger('app')
 
     @property
     def root(self):
@@ -45,7 +47,7 @@ class FileSystem(ABC):
         self.update()
 
     def create_directory(self, path):
-        print(f"Creating directory {path}")
+        self.logger.info(f"Creating directory {path}")
         self._create_directory(path)
 
     @abstractmethod
@@ -59,7 +61,7 @@ class FileSystem(ABC):
         self.update()
 
     def remove_directory(self, path):
-        print(f"Removing directory {path}")
+        self.logger.info(f"Removing directory {path}")
 
         path = self.format_path(path)
         self._remove_directory(path)
@@ -69,7 +71,7 @@ class FileSystem(ABC):
         pass
 
     def remove_file(self, path):
-        print(f"Removing file {path}")
+        self.logger.info(f"Removing file {path}")
         self._remove_file(path)
 
     @abstractmethod
@@ -80,7 +82,7 @@ class FileSystem(ABC):
         src = self.format_path(src)
         dst = self.format_path(dst)
 
-        print(f"Moving {src} to {dst}")
+        self.logger.info(f"Moving {src} to {dst}")
         self._move(src, dst)
 
     @abstractmethod
@@ -217,7 +219,7 @@ class FileSystem(ABC):
             self.tag_path(file, tags)
 
     def tag_path(self, path, tags):
-        print(f"Tagging {path} with {tags}")
+        self.logger.info(f"Tagging {path} with {tags}")
         self._tag_path(path, tags)
 
     def _tag_path(self):
@@ -235,7 +237,7 @@ class FileSystem(ABC):
             self._api.remove_tags(file, tags)
 
     def untag_path(self, path, tags):
-        print(f"Removing {tags} from {path}")
+        self.logger.info(f"Removing {tags} from {path}")
         self._untag_path(path, tags)
 
     def _untag_path(self, path, tags):
@@ -258,7 +260,7 @@ class FileSystem(ABC):
         self.update()
 
     def upload_file(self, local_path, remote_path, tags):
-        print(f"Uploading {local_path} to {remote_path}")
+        self.logger.info(f"Uploading {local_path} to {remote_path}")
         self._upload_file(local_path, remote_path, tags)
 
     def _upload_file(self, local_path, remote_path):

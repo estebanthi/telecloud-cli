@@ -1,4 +1,5 @@
 import os
+import logging
 
 from src.filesystems.FileSystem import FileSystem
 from src.api import Api
@@ -10,9 +11,15 @@ class RemoteFileSystem(FileSystem):
         super().__init__(root)
         self._api = Api(api_url)
 
-        self._files_structure = self._api.get_remote_files_structure()
-        self._directories_structure = self._api.get_remote_folder_structure()
-        self._full_structure = {**self._files_structure, **self._directories_structure}
+        self._logger = logging.getLogger('app')
+        try:
+            self._files_structure = self._api.get_remote_files_structure()
+            self._directories_structure = self._api.get_remote_folder_structure()
+            self._full_structure = {**self._files_structure, **self._directories_structure}
+        except Exception as e:
+            self._logger.error(e)
+            raise ConnectionError("Connection to the server could not be established")
+        self._logger.info("Remote file system initialized")
 
     def _update(self):
         self._files_structure = self._api.get_remote_files_structure()
