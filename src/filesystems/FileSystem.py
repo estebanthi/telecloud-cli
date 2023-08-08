@@ -23,7 +23,6 @@ class FileSystem(ABC):
         self._current = path
 
     def update(self):
-        print("Updating filesystem")
         self._update()
 
     def _update(self):
