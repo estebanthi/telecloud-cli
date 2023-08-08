@@ -66,11 +66,8 @@ class LocalFileSystem(FileSystem):
         path = self.format_path(path)
         return os.path.isdir(path)
 
-    def children(self, path, files=True, directories=True, n=-1):
+    def children(self, path, files=True, directories=True, n=float('inf')):
         path = self.format_path(path)
-
-        if n == -1:
-            n = float('inf')
 
         children = []
         if files:

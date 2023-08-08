@@ -81,7 +81,7 @@ class RemoteFileSystem(FileSystem):
         path = self.format_path(path)
         return os.path.dirname(path)
 
-    def children(self, path, files=True, directories=True, n=0):
+    def children(self, path, files=True, directories=True, n=float('inf')):
         path = self.format_path(path)
 
         children = []

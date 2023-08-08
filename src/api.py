@@ -101,6 +101,8 @@ class Api:
             return True
         return False
 
-    def rm(self, file_id):
-        response = requests.delete(f'{self.api_url}/files/{file_id}')
+    def rm(self, id_):
+        response = requests.delete(f'{self.api_url}/files/{id_}')
+        if response.status_code != 200:
+            response = requests.delete(f'{self.api_url}/directories/{id_}')
         return response.status_code == 200
