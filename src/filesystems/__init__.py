@@ -1,2 +1,3 @@
 from src.filesystems.LocalFileSystem import LocalFileSystem
 from src.filesystems.RemoteFileSystem import RemoteFileSystem
+from src.filesystems.FileSystemConnector import FileSystemConnector

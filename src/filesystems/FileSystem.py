@@ -22,13 +22,74 @@ class FileSystem(ABC):
         path = self.format_path(path)
         self._current = path
 
+    def update(self):
+        print("Updating filesystem")
+        self._update()
+
+    def _update(self):
+        pass
+
     @abstractmethod
     def listdir(self, path):
         pass
 
+    def mkdir(self, path):
+        path = self.format_path(path)
+
+        parent = self.parent(path)
+
+        if not self.isdir(parent):
+            self.mkdir(parent)
+
+        self.create_directory(path)
+
+        self.update()
+
+    def create_directory(self, path):
+        print(f"Creating directory {path}")
+        self._create_directory(path)
+
     @abstractmethod
-    def basename(self, path):
+    def _create_directory(self, path):
         pass
+
+    def rmdir(self, path):
+        path = self.format_path(path)
+        self.remove_directory(path)
+
+        self.update()
+
+    def remove_directory(self, path):
+        print(f"Removing directory {path}")
+        self._remove_directory(path)
+
+    @abstractmethod
+    def _remove_directory(self, path):
+        pass
+
+    def mv(self, src, dst):
+        src = self.format_path(src)
+        dst = self.format_path(dst)
+
+        print(f"Moving {src} to {dst}")
+        self._move(src, dst)
+
+    @abstractmethod
+    def _move(self, src, dst):
+        pass
+
+    @abstractmethod
+    def remove(self, path):
+        pass
+
+    def clean(self, path):
+        path = self.format_path(path)
+        children = self.children(path, files=False, directories=True)
+        for child in children:
+            if self.isempty(child):
+                self.rmdir(child)
+
+        self.update()
 
     @abstractmethod
     def isfile(self, path):
@@ -38,12 +99,27 @@ class FileSystem(ABC):
     def isdir(self, path):
         pass
 
+    def isempty(self, path):
+        path = self.format_path(path)
+        return len(self.children(path)) == 0
+
     @abstractmethod
     def children(self, path, files=True, directories=True, n=0):
         pass
 
     def parent(self, path):
         return os.path.dirname(path)
+
+    @abstractmethod
+    def exists(self, path):
+        pass
+
+    def join(self, *paths):
+        return os.path.join(*paths)
+
+    @abstractmethod
+    def basename(self, path):
+        pass
 
     def normpath(self, path):
         return os.path.normpath(path)
@@ -57,22 +133,6 @@ class FileSystem(ABC):
 
     @abstractmethod
     def get_directories(self, directories, regex=None, recursive=False):
-        pass
-
-    @abstractmethod
-    def exists(self, path):
-        pass
-
-    @abstractmethod
-    def mkdir(self, path):
-        pass
-
-    @abstractmethod
-    def rmdir(self, path):
-        pass
-
-    @abstractmethod
-    def remove(self, path):
         pass
 
     def rm(self, paths, recursive=False, regex=None):
@@ -95,25 +155,10 @@ class FileSystem(ABC):
                             else:
                                 self.remove(child)
                     self.clean(path)
-                    if self.is_empty(path):
+                    if self.isempty(path):
                         self.rmdir(path)
 
-    def tag(self, paths, tags, regex=None, recursive=True):
-        pass
-
-    def untag(self, paths, tags, regex=None, recursive=True):
-        pass
-
-    def is_empty(self, path):
-        path = self.format_path(path)
-        return len(self.children(path)) == 0
-
-    def clean(self, path):
-        path = self.format_path(path)
-        children = self.children(path, files=False, directories=True)
-        for child in children:
-            if self.is_empty(child):
-                self.rmdir(child)
+        self.update()
 
     def filter(self, paths, regex):
         paths = self.format_paths(paths)
@@ -128,9 +173,6 @@ class FileSystem(ABC):
                 filtered_paths.append(path)
         return filtered_paths
 
-    def join(self, *paths):
-        return os.path.join(*paths)
-
     def format_path(self, path):
         if path == '.':
             return self.current
@@ -143,3 +185,62 @@ class FileSystem(ABC):
 
     def format_paths(self, paths):
         return [self.format_path(path) for path in paths]
+
+    def tag(self, files, directories, tags, regex, recursive):
+        files = self.format_paths(files)
+        directories = self.format_paths(directories)
+
+        if directories:
+            files += self.get_files(directories, regex=regex, recursive=recursive)
+
+        files = self.filter(files, regex)
+        for file in files:
+            self.tag_path(file, tags)
+
+    def tag_path(self, path, tags):
+        print(f"Tagging {path} with {tags}")
+        self._tag_path(path, tags)
+
+    def _tag_path(self):
+        pass
+
+    def untag(self, files, directories, tags, regex, recursive):
+        files = self.format_paths(files)
+        directories = self.format_paths(directories)
+
+        if directories:
+            files += self.get_files(directories, regex=regex, recursive=recursive)
+
+        files = self.filter(files, regex)
+        for file in files:
+            self._api.remove_tags(file, tags)
+
+    def untag_path(self, path, tags):
+        print(f"Removing {tags} from {path}")
+        self._untag_path(path, tags)
+
+    def _untag_path(self, path, tags):
+        pass
+
+
+    def upload(self, local_paths, remote_paths, tags):
+        files = self.format_paths(remote_paths)
+
+        for path in files:
+            parent = self.parent(path)
+            if not self.isdir(parent):
+                self.mkdir(parent)
+
+        for index, file in enumerate(remote_paths):
+            local_path = local_paths[index]
+            remote_path = file
+            self.upload_file(local_path, remote_path, tags)
+
+        self.update()
+
+    def upload_file(self, local_path, remote_path):
+        print(f"Uploading {local_path} to {remote_path}")
+        self._upload_file(local_path, remote_path)
+
+    def _upload_file(self, local_path, remote_path):
+        pass

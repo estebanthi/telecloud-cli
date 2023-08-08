@@ -6,15 +6,18 @@ import re
 import shutil
 
 from src.modes import MODES
-import src.utils as utils
 from src.api import Api
-from src.filesystems import LocalFileSystem, RemoteFileSystem
+from src.filesystems import LocalFileSystem, RemoteFileSystem, FileSystemConnector
 
 
 class Interpreter(cmd.Cmd):
 
     def __init__(self, api_url, default_mode=MODES.LOCAL):
         cmd.Cmd.__init__(self)
+        self.remote_filesystem = None
+        self.local_filesystem = None
+        self.mode = None
+        self.api = None
         self.configure(api_url, default_mode)
 
     def configure(self, api_url, default_mode=MODES.LOCAL):
@@ -209,7 +212,7 @@ class Interpreter(cmd.Cmd):
     def validate_rmdir(self, directory):
         filesystem = self.get_filesystem()
 
-        if not filesystem.is_empty(directory):
+        if not filesystem.isempty(directory):
             print(f"Directory {directory} is not empty.")
             return False
 
@@ -442,28 +445,8 @@ class Interpreter(cmd.Cmd):
         regex = args.regex
         recursive = args.recursive
 
-        files_from_dirs = self.local_filesystem.get_files(directories=directories, regex=regex, recursive=recursive)
-        paths_from_dirs = []
-        for file in files_from_dirs:
-            parent = None
-            for directory in directories:
-                if directory in file:
-                    parent = self.local_filesystem.format_path(directory)
-                    break
-            if parent:
-                path = self.local_filesystem.relative(file, parent)
-                paths_from_dirs.append(os.path.join(self.local_filesystem.basename(parent), path))
-
-        paths_from_dirs = [os.path.join(to, path) for path in paths_from_dirs]
-
-        files_from_files = self.local_filesystem.filter(files, regex=regex)
-        paths_from_files = [self.local_filesystem.basename(file) for file in files_from_files]
-        paths_from_files = [os.path.join(to, path) for path in paths_from_files]
-
-        local_paths = files_from_dirs + files_from_files
-        remote_paths = paths_from_dirs + paths_from_files
-
-        self.remote_filesystem.upload(local_paths, remote_paths, tags, regex)
+        filesystem_connector = FileSystemConnector(self.local_filesystem, self.remote_filesystem)
+        filesystem_connector.upload(files, directories, to, tags, regex, recursive)
 
     def do_download(self, args):
         parser = argparse.ArgumentParser()

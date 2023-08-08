@@ -1,5 +1,4 @@
 import requests
-import src.utils as utils
 import mimetypes
 import os
 from tqdm import tqdm
