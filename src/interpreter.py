@@ -101,6 +101,12 @@ class Interpreter(cmd.Cmd):
             return False
         return True
 
+    def validate_files(self, paths, filesystem=None, should_exist=True):
+        for path in paths:
+            if not self.validate_file(path, filesystem, should_exist):
+                return False
+        return True
+
     def do_ls(self, args):
         parser = argparse.ArgumentParser()
         parser.add_argument('directories', type=str, nargs='*')
@@ -214,6 +220,44 @@ class Interpreter(cmd.Cmd):
     def rmdir(self, directory):
         filesystem = self.get_filesystem()
         filesystem.rmdir(directory)
+
+
+    def do_rm(self, args):
+        parser = argparse.ArgumentParser()
+        parser.add_argument('files', nargs='+', help='Files to be removed.')
+        parser.add_argument('-r', '--recursive', action='store_true', help='Remove recursively.')
+        parser.add_argument('-re', '--regex', help='Regex to filter files.')
+        args = parser.parse_args(args.split())
+
+        if self.validate_rm(args):
+            self.rm(args)
+
+    def help_rm(self):
+        print("Remove files.")
+        print("Usage: rm FILES [-r] [-re regex]")
+        print("Options:")
+        print("  -r, --recursive      Remove recursively.")
+        print("  -re, --regex [regex] Filter by regex.")
+
+    def validate_rm(self, args):
+        filesystem = self.get_filesystem()
+        files = args.files
+        recursive = args.recursive
+
+        if recursive and not self.validate_paths(files, filesystem, should_exist=True):
+            return False
+        elif not recursive and not self.validate_files(files, filesystem, should_exist=True):
+            return False
+
+        return True
+
+    def rm(self, args):
+        filesystem = self.get_filesystem()
+        files = args.files
+        recursive = args.recursive
+        regex = args.regex
+
+        filesystem.rm(files, recursive, regex)
 
     def do_tag(self, args):
         parser = argparse.ArgumentParser()
@@ -509,49 +553,3 @@ class Interpreter(cmd.Cmd):
         files = [self.remote_files_structure[file] for file in files]
         for file in files:
             self.api.download(file, to)
-
-    def do_rm(self, args):
-        parser = argparse.ArgumentParser()
-        parser.add_argument('files', nargs='+', help='Files to be removed.')
-        parser.add_argument('-r', '--regex', help='Regex to filter files.')
-        args = parser.parse_args(args.split())
-
-        if self.validate_rm(args):
-            self.rm(args)
-
-    def help_rm(self):
-        print("Remove files.")
-        print("Usage: rm [OPTIONS] FILES")
-        print("Note: FILES are the files to be removed.")
-        print("Options:")
-        print("  -d, --directories TEXT  Directories to be removed.")
-        print("  -r, --regex TEXT        Regex to filter files.")
-
-    def validate_rm(self, args):
-        args.files = utils.format_paths(self.local_dir if self.mode == MODES.LOCAL else self.remote_dir, args.files)
-        for file in args.files:
-            if not utils.path_exists(file, self.mode, self.remote_files_structure):
-                print(f"File {file} does not exist.")
-                return False
-        return True
-
-    def rm(self, args):
-        if self.mode == MODES.LOCAL:
-            for file in args.files:
-                os.remove(file)
-        else:
-            files = args.files
-            regex = args.regex
-
-            files = utils.format_paths(self.local_dir if self.mode == MODES.LOCAL else self.remote_dir, files)
-
-            if regex:
-                files = [file for file in files if re.search(regex, file)]
-
-            for file in files:
-                file_id = self.remote_files_structure[file]
-                self.api.rm(file_id)
-
-            self.remote_files_structure = self.api.get_remote_files_structure()
-            self.remote_folder_structure = self.api.get_remote_folder_structure()
-

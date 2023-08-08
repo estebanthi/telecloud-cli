@@ -1,5 +1,6 @@
 import os
 import re
+import shutil
 
 from src.filesystems.FileSystem import FileSystem
 
@@ -65,22 +66,23 @@ class LocalFileSystem(FileSystem):
         path = self.format_path(path)
         return os.path.isdir(path)
 
-    def children(self, path, files=True, directories=True, n=0):
+    def children(self, path, files=True, directories=True, n=-1):
         path = self.format_path(path)
+
+        if n == -1:
+            n = float('inf')
 
         children = []
         if files:
-            children += [os.path.join(path, f) for f in os.listdir(path) if os.path.isfile(os.path.join(path, f))]
+            if os.path.isdir(path):
+                children += [os.path.join(path, f) for f in os.listdir(path) if os.path.isfile(os.path.join(path, f))]
         if directories:
-            children += [os.path.join(path, d) for d in os.listdir(path) if os.path.isdir(os.path.join(path, d))]
+            if os.path.isdir(path):
+                children += [os.path.join(path, d) for d in os.listdir(path) if os.path.isdir(os.path.join(path, d))]
         if n > 0:
             for child in children:
                 children += self.children(child, files, directories, n-1)
         return children
-
-    def exists(self, path):
-        path = self.format_path(path)
-        return os.path.exists(path)
 
     def mkdir(self, path):
         path = self.format_path(path)
@@ -89,3 +91,7 @@ class LocalFileSystem(FileSystem):
     def rmdir(self, path):
         path = self.format_path(path)
         os.rmdir(path)
+
+    def remove(self, path):
+        path = self.format_path(path)
+        os.remove(path)

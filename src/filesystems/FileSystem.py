@@ -70,9 +70,43 @@ class FileSystem(ABC):
     def rmdir(self, path):
         pass
 
+    @abstractmethod
+    def remove(self, path):
+        pass
+
+    def rm(self, paths, recursive=False, regex=None):
+        paths = self.format_paths(paths)
+
+        for path in paths:
+            if self.isfile(path):
+                if regex:
+                    if re.match(regex, self.basename(path)):
+                        self.remove(path)
+                else:
+                    self.remove(path)
+            elif self.isdir(path):
+                if recursive:
+                    for child in self.children(path, files=True, directories=True):
+                        if self.isfile(child):
+                            if regex:
+                                if re.match(regex, self.basename(child)):
+                                    self.remove(child)
+                            else:
+                                self.remove(child)
+                    self.clean(path)
+                    if self.is_empty(path):
+                        self.rmdir(path)
+
     def is_empty(self, path):
         path = self.format_path(path)
         return len(self.children(path)) == 0
+
+    def clean(self, path):
+        path = self.format_path(path)
+        children = self.children(path, files=False, directories=True)
+        for child in children:
+            if self.is_empty(child):
+                self.rmdir(child)
 
     def filter(self, paths, regex):
         paths = self.format_paths(paths)

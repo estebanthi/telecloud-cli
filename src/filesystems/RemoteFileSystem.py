@@ -105,3 +105,10 @@ class RemoteFileSystem(FileSystem):
         directory_id = self._directories_structure[path]
         self._api.delete_directory(directory_id)
         self.update_structure()
+
+    def remove(self, path):
+        path = self.format_path(path)
+
+        file_id = self._files_structure[path]
+        self._api.rm(file_id)
+        self.update_structure()
