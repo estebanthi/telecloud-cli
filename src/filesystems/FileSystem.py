@@ -103,9 +103,23 @@ class FileSystem(ABC):
         path = self.format_path(path)
         return len(self.children(path)) == 0
 
-    @abstractmethod
-    def children(self, path, files=True, directories=True, n=0):
-        pass
+    def children(self, path, files=True, directories=True, n=float('inf')):
+        path = self.format_path(path)
+
+        children = []
+        if files:
+            if self.isdir(path):
+                children += [self.join(path, f) for f in self.listdir(path) if self.isfile(self.join(path, f))]
+        if directories:
+            if self.isdir(path):
+                children += [self.join(path, d) for d in self.listdir(path) if self.isdir(self.join(path, d))]
+        if n > 0:
+            for child in children:
+                children += self.children(child, files, directories, n-1)
+
+        children = list(set(children))
+        children.sort(key=lambda child: child.count('/'), reverse=True)
+        return children
 
     def parent(self, path):
         return os.path.dirname(path)

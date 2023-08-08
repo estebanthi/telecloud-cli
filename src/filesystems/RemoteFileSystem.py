@@ -68,19 +68,6 @@ class RemoteFileSystem(FileSystem):
         path = self.format_path(path)
         return path in self._directories_structure
 
-    def children(self, path, files=True, directories=True, n=float('inf')):
-        path = self.format_path(path)
-
-        children = []
-        if files:
-            children += [os.path.join(path, f) for f in self._files_structure if self.parent(f) == path]
-        if directories:
-            children += [os.path.join(path, d) for d in self._directories_structure if self.parent(d) == path]
-        if n > 0:
-            for child in children:
-                children += self.children(child, files, directories, n-1)
-        return list(set(children))
-
     def parent(self, path):
         path = self.format_path(path)
         return os.path.dirname(path)

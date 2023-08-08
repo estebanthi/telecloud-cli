@@ -35,24 +35,6 @@ class LocalFileSystem(FileSystem):
         path = self.format_path(path)
         return os.path.isdir(path)
 
-    def children(self, path, files=True, directories=True, n=float('inf')):
-        path = self.format_path(path)
-
-        children = []
-        if files:
-            if os.path.isdir(path):
-                children += [os.path.join(path, f) for f in os.listdir(path) if os.path.isfile(os.path.join(path, f))]
-        if directories:
-            if os.path.isdir(path):
-                children += [os.path.join(path, d) for d in os.listdir(path) if os.path.isdir(os.path.join(path, d))]
-        if n > 0:
-            for child in children:
-                children += self.children(child, files, directories, n-1)
-
-        children = list(set(children))
-        children.sort(key=lambda child: child.count('/'), reverse=True)
-        return children
-
     def exists(self, path):
         path = self.format_path(path)
         return os.path.exists(path)
