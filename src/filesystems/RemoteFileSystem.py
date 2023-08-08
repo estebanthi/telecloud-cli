@@ -10,8 +10,8 @@ class RemoteFileSystem(FileSystem):
         super().__init__(root)
         self._api = Api(api_url)
 
-        self._files_structure = self._api.get_remote_files_structure() or {'/a.txt': 'id1', '/b.txt': 'id2', '/directory1/c.txt': 'id3', '/directory2/d.txt': 'id4'}
-        self._directories_structure = self._api.get_remote_folder_structure() or {'/directory1': 'id5', '/directory2': 'id6'}
+        self._files_structure = self._api.get_remote_files_structure()
+        self._directories_structure = self._api.get_remote_folder_structure()
         self._full_structure = {**self._files_structure, **self._directories_structure}
 
     def update_structure(self):

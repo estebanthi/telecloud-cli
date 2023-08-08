@@ -83,6 +83,12 @@ class LocalFileSystem(FileSystem):
 
     def mkdir(self, path):
         path = self.format_path(path)
+
+        parent = self.parent(path)
+
+        if not self.isdir(parent):
+            self.mkdir(parent)
+
         os.mkdir(path)
 
     def rmdir(self, path):
