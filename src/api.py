@@ -20,7 +20,7 @@ class Api:
 
     def get_files_meta(self, tags, directories):
         query = {"tags": tags, "directories": directories}
-        url = utils.format_url(f"{self.api_url}/files/meta", query)
+        url = self._format_url(f"{self.api_url}/files/meta", query)
         res = requests.get(url)
         files = res.json() if res.status_code == 200 else []
         return files
@@ -105,3 +105,16 @@ class Api:
         if response.status_code != 200:
             response = requests.delete(f'{self.api_url}/directories/{id_}')
         return response.status_code == 200
+
+    def _format_url(self, url, query):
+        if query:
+            url += "?"
+            for key, value in query.items():
+                if value:
+                    if type(value) == list:
+                        for v in value:
+                            url += f"{key}={v}&"
+                    else:
+                        url += f"{key}={value}&"
+            url = url[:-1]
+        return url

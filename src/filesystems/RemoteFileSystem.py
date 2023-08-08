@@ -1,5 +1,4 @@
 import os
-import logging
 
 from src.filesystems.FileSystem import FileSystem
 from src.api import Api
@@ -11,8 +10,8 @@ class RemoteFileSystem(FileSystem):
         super().__init__(root)
         self._api = Api(api_url)
 
-        self._files_structure = {}
-        self._directories_structure = {}
+        self._files_structure = self._api.get_remote_files_structure()
+        self._directories_structure = self._api.get_remote_folder_structure()
         self._full_structure = {**self._files_structure, **self._directories_structure}
 
     def _update(self):
@@ -54,9 +53,7 @@ class RemoteFileSystem(FileSystem):
 
         self.update_structure()
 
-    def remove(self, path):
-        path = self.format_path(path)
-
+    def _remove_file(self, path):
         file_id = self._files_structure[path]
         self._api.rm(file_id)
 

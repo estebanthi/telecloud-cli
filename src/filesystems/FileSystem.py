@@ -60,10 +60,20 @@ class FileSystem(ABC):
 
     def remove_directory(self, path):
         print(f"Removing directory {path}")
+
+        path = self.format_path(path)
         self._remove_directory(path)
 
     @abstractmethod
     def _remove_directory(self, path):
+        pass
+
+    def remove_file(self, path):
+        print(f"Removing file {path}")
+        self._remove_file(path)
+
+    @abstractmethod
+    def _remove_file(self, path):
         pass
 
     def mv(self, src, dst):
@@ -75,10 +85,6 @@ class FileSystem(ABC):
 
     @abstractmethod
     def _move(self, src, dst):
-        pass
-
-    @abstractmethod
-    def remove(self, path):
         pass
 
     def clean(self, path):
@@ -155,18 +161,18 @@ class FileSystem(ABC):
             if self.isfile(path):
                 if regex:
                     if re.match(regex, self.basename(path)):
-                        self.remove(path)
+                        self.remove_file(path)
                 else:
-                    self.remove(path)
+                    self.remove_file(path)
             elif self.isdir(path):
                 if recursive:
                     for child in self.children(path, files=True, directories=True):
                         if self.isfile(child):
                             if regex:
                                 if re.match(regex, self.basename(child)):
-                                    self.remove(child)
+                                    self.remove_file(child)
                             else:
-                                self.remove(child)
+                                self.remove_file(child)
                     self.clean(path)
                     if self.isempty(path):
                         self.rmdir(path)
@@ -251,9 +257,9 @@ class FileSystem(ABC):
 
         self.update()
 
-    def upload_file(self, local_path, remote_path):
+    def upload_file(self, local_path, remote_path, tags):
         print(f"Uploading {local_path} to {remote_path}")
-        self._upload_file(local_path, remote_path)
+        self._upload_file(local_path, remote_path, tags)
 
     def _upload_file(self, local_path, remote_path):
         pass

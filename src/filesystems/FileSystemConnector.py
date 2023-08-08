@@ -29,4 +29,4 @@ class FileSystemConnector:
         local_paths = files_from_dirs + files_from_files
         remote_paths = paths_from_dirs + paths_from_files
 
-        self._remote_filesystem.upload(local_paths, remote_paths, tags, regex)
+        self._remote_filesystem.upload(local_paths, remote_paths, tags)
