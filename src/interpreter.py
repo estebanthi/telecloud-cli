@@ -259,6 +259,53 @@ class Interpreter(cmd.Cmd):
 
         filesystem.rm(files, recursive, regex)
 
+    def do_mv(self, args):
+        parser = argparse.ArgumentParser()
+        parser.add_argument('old', help='Old file path.')
+        parser.add_argument('new', help='New file path.')
+        args = parser.parse_args(args.split())
+
+        if self.validate_mv(args):
+            self.mv(args)
+
+    def help_mv(self):
+        print("Move a file.")
+        print("Usage: mv OLD NEW")
+
+    def validate_mv(self, args):
+        filesystem = self.get_filesystem()
+        old = args.old
+        new = args.new
+
+        old_is_file = filesystem.isfile(old)
+        new_is_file = filesystem.isfile(new)
+
+        if not self.validate_path(old, filesystem, should_exist=True):
+            return False
+
+        if old_is_file and new_is_file:
+            print(f"Cannot move a file to another file.")
+            return False
+
+        if not old_is_file and new_is_file:
+            print(f"Cannot move a directory to a file.")
+            return False
+
+        if not new_is_file:
+            basename = filesystem.basename(old)
+            new = filesystem.join(new, basename)
+            if not self.validate_path(new, filesystem, should_exist=False):
+                return False
+
+        return True
+
+    def mv(self, args):
+        filesystem = self.get_filesystem()
+        old = args.old
+        new = args.new
+
+        filesystem.mv(old, new)
+
     def do_tag(self, args):
         parser = argparse.ArgumentParser()
         parser.add_argument('tags', nargs='+', help='Tags to be added to the file.', default=[])
@@ -377,54 +424,7 @@ class Interpreter(cmd.Cmd):
             self.api.remove_tags(file_id, tags)
 
 
-    def do_mv(self, args):
-        parser = argparse.ArgumentParser()
-        parser.add_argument('old', help='Old file path.')
-        parser.add_argument('new', help='New file path.')
-        args = parser.parse_args(args.split())
 
-        old = utils.format_path(self.local_dir if self.mode == MODES.LOCAL else self.remote_dir, args.old)
-        new = utils.format_path(self.local_dir if self.mode == MODES.LOCAL else self.remote_dir, args.new)
-
-        if self.validate_mv(old, new):
-            self.mv(old, new)
-
-    def help_mv(self):
-        print("Move a file.")
-        print("Usage: mv OLD NEW")
-        print("Note: OLD is the old path and NEW is the new path.")
-
-    def validate_mv(self, old, new):
-        structure = self.remote_files_structure | self.remote_folder_structure
-        if not utils.path_exists(old, self.mode, structure):
-            print(f"{old} does not exist.")
-            return False
-        if utils.path_exists(new, self.mode, structure):
-            print(f"{new} already exists.")
-            return False
-        return True
-
-    def mv(self, old, new):
-        if self.mode == MODES.LOCAL:
-            os.rename(old, new)
-        else:
-            structure = self.remote_files_structure | self.remote_folder_structure
-            id_ = structure[old]
-
-            is_rename = old.split('/')[-1] != new.split('/')[-1]
-            if is_rename:
-                self.api.rename(id_, new.split('/')[-1])
-
-            is_move = old.split('/')[:-1] != new.split('/')[:-1]
-            if is_move:
-                new_parent = '/'.join(new.split('/')[:-1])
-                if new_parent == '':
-                    new_parent = '/'
-                new_parent_id = structure[new_parent]
-                self.api.move(id_, new_parent_id)
-
-            self.remote_files_structure = self.api.get_remote_files_structure()
-            self.remote_folder_structure = self.api.get_remote_folder_structure()
 
     def do_upload(self, args):
         parser = argparse.ArgumentParser()

@@ -95,3 +95,8 @@ class LocalFileSystem(FileSystem):
     def remove(self, path):
         path = self.format_path(path)
         os.remove(path)
+
+    def mv(self, src, dst):
+        src = self.format_path(src)
+        dst = self.format_path(dst)
+        shutil.move(src, dst)

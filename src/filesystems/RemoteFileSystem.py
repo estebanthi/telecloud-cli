@@ -112,3 +112,23 @@ class RemoteFileSystem(FileSystem):
         file_id = self._files_structure[path]
         self._api.rm(file_id)
         self.update_structure()
+
+    def mv(self, src, dst):
+        src = self.format_path(src)
+        dst = self.format_path(dst)
+
+        dst_is_file = self.isfile(dst)
+        dst_exists = self.exists(dst)
+
+        if not dst_exists:
+            src_id = self._full_structure[src]
+            dst_basename = self.basename(dst)
+            self._api.rename(src_id, dst_basename)
+
+        elif not dst_is_file:
+            src_id = self._full_structure[src]
+            dst_id = self._directories_structure[dst]
+            self._api.move(src_id, dst_id)
+
+
+        self.update_structure()

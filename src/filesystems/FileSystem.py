@@ -118,6 +118,9 @@ class FileSystem(ABC):
                 filtered_paths.append(path)
         return filtered_paths
 
+    def join(self, *paths):
+        return os.path.join(*paths)
+
     def format_path(self, path):
         if path == '.':
             return self.current
