@@ -19,6 +19,7 @@ class FileSystem(ABC):
 
     @current.setter
     def current(self, path):
+        path = self.format_path(path)
         self._current = path
 
     @abstractmethod
@@ -96,6 +97,12 @@ class FileSystem(ABC):
                     self.clean(path)
                     if self.is_empty(path):
                         self.rmdir(path)
+
+    def tag(self, paths, tags, regex=None, recursive=True):
+        pass
+
+    def untag(self, paths, tags, regex=None, recursive=True):
+        pass
 
     def is_empty(self, path):
         path = self.format_path(path)

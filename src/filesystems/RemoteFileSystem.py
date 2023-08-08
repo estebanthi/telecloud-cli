@@ -23,17 +23,22 @@ class RemoteFileSystem(FileSystem):
         directories = self.format_paths(directories)
 
         if recursive:
-            directories = self.get_directories(directories, recursive=True)
+            directories = self.get_directories(directories, recursive=True) + directories
 
         directories_ids = [self._directories_structure[directory] for directory in directories]
         files = self._api.get_files_meta(directories=directories_ids, tags=tags)
 
-        files_names = [file['name'] for file in files]
+        files_ = []
+        for file in files:
+            file_id = file['_id']
+            for k, v in self._files_structure.items():
+                if v == file_id:
+                    files_.append(k)
 
         if regex:
-            files = self.filter_entities(files_names, regex)
+            files_ = self.filter_entities(files_, regex)
 
-        return [os.path.join(self.root, file['name']) for file in files]
+        return files_
 
     def get_directories(self, directories, regex=None, recursive=False):
         directories = self.format_paths(directories)
@@ -132,3 +137,29 @@ class RemoteFileSystem(FileSystem):
 
 
         self.update_structure()
+
+    def tag(self, files, directories, tags, regex, recursive):
+        files = self.format_paths(files)
+        directories = self.format_paths(directories)
+
+        if directories:
+            files += self.get_files(directories, regex=regex, recursive=recursive)
+
+        self.filter(files, regex) if regex else None
+
+        files_ids = [self._files_structure[file] for file in files]
+        for file_id in files_ids:
+            self._api.add_tags(file_id, tags)
+
+    def untag(self, files, directories, tags, regex, recursive):
+        files = self.format_paths(files)
+        directories = self.format_paths(directories)
+
+        if directories:
+            files += self.get_files(directories, regex=regex, recursive=recursive)
+
+        self.filter(files, regex) if regex else None
+
+        files_ids = [self._files_structure[file] for file in files]
+        for file_id in files_ids:
+            self._api.remove_tags(file_id, tags)

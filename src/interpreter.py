@@ -309,68 +309,53 @@ class Interpreter(cmd.Cmd):
     def do_tag(self, args):
         parser = argparse.ArgumentParser()
         parser.add_argument('tags', nargs='+', help='Tags to be added to the file.', default=[])
-        parser.add_argument('-r', '--regex', help='Regex to filter files.')
-        parser.add_argument('-d', '--directories', nargs='+', help='Directories to be searched.', default=[])
-        parser.add_argument('-f', '--files', nargs='+', help='Files to be searched.', default=[])
+        parser.add_argument('-re', '--regex', help='Regex to filter files.')
+        parser.add_argument('-r', '--recursive', action='store_true', help='Tag recursively.')
+        parser.add_argument('-d', '--directories', nargs='+', help='Directories to tag.', default=[])
+        parser.add_argument('-f', '--files', nargs='+', help='Files to tag.', default=[])
         args = parser.parse_args(args.split())
 
-        if self.validate_tags(args):
+        if self.validate_tag(args):
             self.tag(args)
 
     def help_tag(self):
         print("Add tags to files.")
-        print("Usage: tag [OPTIONS] TAGS")
-        print("Note: TAGS are the tags to be added to the file.")
+        print("Usage: tag TAGS [-re regex] [-d directories] [-f files]")
         print("Options:")
-        print("  -r, --regex TEXT        Regex to filter files.")
-        print("  -d, --directories TEXT  Directories to be searched.")
-        print("  -f, --files TEXT        Files to be searched.")
+        print("  -re, --regex [regex] Filter by regex.")
+        print("  -r, --recursive      Tag recursively.")
+        print("  -d, --directories    Directories to tag.")
+        print("  -f, --files          Files to tag.")
 
-    def validate_tags(self, args):
+    def validate_tag(self, args):
+        files = args.files or []
+        directories = args.directories or []
+
         if self.mode == MODES.LOCAL:
             print("Cannot tag files in local mode.")
             return False
-        if args.directories:
-            args.directories = utils.format_paths(self.remote_dir, args.directories)
-            for directory in args.directories:
-                if not utils.path_exists(directory, self.mode, self.remote_folder_structure):
-                    print(f"Directory {directory} does not exist.")
-                    return False
-        if args.files:
-            args.files = utils.format_paths(self.remote_dir, args.files)
-            for file in args.files:
-                if not utils.path_exists(file, self.mode, self.remote_folder_structure):
-                    print(f"File {file} does not exist.")
-                    return False
-        return True
+
+        return self.validate_files(files, should_exist=True) and self.validate_directories(directories, should_exist=True)
+
 
     def tag(self, args):
-        directories = args.directories if args.directories else [self.remote_dir]
+        filesystem = self.get_filesystem()
+
         files = args.files if args.files else []
+        directories = args.directories if args.directories else []
         tags = args.tags
         regex = args.regex
+        recursive = args.recursive
 
-        directories = utils.format_paths(self.remote_dir, directories)
-        files = utils.format_paths(self.remote_dir, files)
-
-        for directory in directories:
-            files += utils.get_directory_children(self.remote_files_structure, directory)
-        files = utils.remove_dupes(files)
-
-        if regex:
-            files = [file for file in files if re.search(regex, file)]
-
-        for file in files:
-            file_id = self.remote_files_structure[file]
-            self.api.add_tags(file_id, tags)
-
+        filesystem.tag(files, directories, tags, regex, recursive)
 
     def do_untag(self, args):
         parser = argparse.ArgumentParser()
         parser.add_argument('tags', nargs='+', help='Tags to be removed from the file.', default=[])
-        parser.add_argument('-r', '--regex', help='Regex to filter files.')
-        parser.add_argument('-d', '--directories', nargs='+', help='Directories to be searched.', default=[])
-        parser.add_argument('-f', '--files', nargs='+', help='Files to be searched.', default=[])
+        parser.add_argument('-re', '--regex', help='Regex to filter files.')
+        parser.add_argument('-r', '--recursive', action='store_true', help='Untag recursively.')
+        parser.add_argument('-d', '--directories', nargs='+', help='Directories to untag.', default=[])
+        parser.add_argument('-f', '--files', nargs='+', help='Files to untag.', default=[])
         args = parser.parse_args(args.split())
 
         if self.validate_untag(args):
@@ -378,53 +363,33 @@ class Interpreter(cmd.Cmd):
 
     def help_untag(self):
         print("Remove tags from files.")
-        print("Usage: untag [OPTIONS] TAGS")
-        print("Note: TAGS are the tags to be removed from the file.")
+        print("Usage: untag TAGS [-re regex] [-d directories] [-f files]")
         print("Options:")
-        print("  -r, --regex TEXT        Regex to filter files.")
-        print("  -d, --directories TEXT  Directories to be searched.")
-        print("  -f, --files TEXT        Files to be searched.")
+        print("  -re, --regex [regex] Filter by regex.")
+        print("  -r, --recursive      Untag recursively.")
+        print("  -d, --directories    Directories to untag.")
+        print("  -f, --files          Files to untag.")
 
     def validate_untag(self, args):
+        files = args.files or []
+        directories = args.directories or []
+
         if self.mode == MODES.LOCAL:
             print("Cannot untag files in local mode.")
             return False
-        if args.directories:
-            args.directories = utils.format_paths(self.remote_dir, args.directories)
-            for directory in args.directories:
-                if not utils.path_exists(directory, self.mode, self.remote_folder_structure):
-                    print(f"Directory {directory} does not exist.")
-                    return False
-        if args.files:
-            args.files = utils.format_paths(self.remote_dir, args.files)
-            for file in args.files:
-                if not utils.path_exists(file, self.mode, self.remote_folder_structure):
-                    print(f"File {file} does not exist.")
-                    return False
-        return True
+
+        return self.validate_files(files, should_exist=True) and self.validate_directories(directories, should_exist=True)
 
     def untag(self, args):
-        directories = args.directories if args.directories else [self.remote_dir]
+        filesystem = self.get_filesystem()
+
         files = args.files if args.files else []
+        directories = args.directories if args.directories else []
         tags = args.tags
         regex = args.regex
+        recursive = args.recursive
 
-        directories = utils.format_paths(self.remote_dir, directories)
-        files = utils.format_paths(self.remote_dir, files)
-
-        for directory in directories:
-            files += utils.get_directory_children(self.remote_files_structure, directory)
-        files = utils.remove_dupes(files)
-
-        if regex:
-            files = [file for file in files if re.search(regex, file)]
-
-        for file in files:
-            file_id = self.remote_files_structure[file]
-            self.api.remove_tags(file_id, tags)
-
-
-
+        filesystem.untag(files, directories, tags, regex, recursive)
 
     def do_upload(self, args):
         parser = argparse.ArgumentParser()
