@@ -17,7 +17,7 @@ class Interpreter(cmd.Cmd):
         cmd.Cmd.__init__(self)
         self.configure(api_url, default_mode)
 
-    def configure(self, api_url, default_mode=MODES.LOCAL, root_symbol='/'):
+    def configure(self, api_url, default_mode=MODES.LOCAL):
         self.api = Api(api_url)
 
         self.mode = default_mode
@@ -40,6 +40,9 @@ class Interpreter(cmd.Cmd):
             self.update_prompt()
         return wrapper
 
+    def get_filesystem(self):
+        return self.local_filesystem if self.mode == MODES.LOCAL else self.remote_filesystem
+
     def run(self):
         self.cmdloop("\n--- Telecloud CLI - Type help or ? to list commands. ---\n")
 
@@ -54,7 +57,7 @@ class Interpreter(cmd.Cmd):
         print("Switch between local and remote mode.")
 
     def validate_path(self, path, filesystem=None, should_exist=True):
-        filesystem = filesystem or self.local_filesystem if self.mode == MODES.LOCAL else self.remote_filesystem
+        filesystem = filesystem or self.get_filesystem()
 
         if should_exist and not filesystem.exists(path):
             print(f"Path {path} does not exist.")
@@ -70,37 +73,68 @@ class Interpreter(cmd.Cmd):
                 return False
         return True
 
+    def validate_directory(self, path, filesystem=None, should_exist=True):
+        filesystem = filesystem or self.get_filesystem()
+
+        if not self.validate_path(path, filesystem, should_exist):
+            return False
+
+        if not filesystem.isdir(path):
+            print(f"Path {path} is not a directory.")
+            return False
+        return True
+
+    def validate_directories(self, paths, filesystem=None, should_exist=True):
+        for path in paths:
+            if not self.validate_directory(path, filesystem, should_exist):
+                return False
+        return True
+
+    def validate_file(self, path, filesystem=None, should_exist=True):
+        filesystem = filesystem or self.get_filesystem()
+
+        if not self.validate_path(path, filesystem, should_exist):
+            return False
+
+        if not filesystem.isfile(path):
+            print(f"Path {path} is not a file.")
+            return False
+        return True
+
     def do_ls(self, args):
         parser = argparse.ArgumentParser()
         parser.add_argument('directories', type=str, nargs='*')
         parser.add_argument('-t', "--tags", type=str, nargs='+', required=False)
-        parser.add_argument('-r', '--recursive', action='store_true', required=False)
         parser.add_argument('-re', "--regex", type=str, required=False)
+        parser.add_argument('-r', '--recursive', action='store_true', required=False)
         args = parser.parse_args(args.split())
 
         if self.validate_ls(args):
             self.ls(args)
 
     def validate_ls(self, args):
-        filesystem = self.local_filesystem if self.mode == MODES.LOCAL else self.remote_filesystem
+        filesystem = self.get_filesystem()
         directories = args.directories or [filesystem.current]
 
-        if not self.validate_paths(directories, should_exist=True):
+        if not self.validate_directories(directories, filesystem):
             return False
+
+        if args.tags and self.mode == MODES.LOCAL:
+            print("Tags are only available in remote mode.")
+            return False
+
         return True
 
     def help_ls(self):
         print("List files and directories.")
-        print("Usage: ls DIRECTORIES [-t TAGS] [-r REGEX] [-a]")
-        print("If no options are specified, all files and directories in current directory are listed.")
+        print("Usage: ls [directories] [-t tags] [-re regex] [-r]")
         print("Options:")
-        print("  -t, --tags TAGS\t\t\tList files with specified tags.")
-        print("  -r, --regex REGEX\t\t\tList files and directories with names matching specified regex.")
-        print("  -a, --all\t\t\t\tList all files and directories.")
-        print("Note: If multiple options are specified, only files and directories that satisfy all options are listed.")
+        print("  -t, --tags [tags]    Filter by tags.")
+        print("  -re, --regex [regex] Filter by regex.")
+        print("  -r, --recursive      List recursively.")
 
     def ls(self, args):
-        filesystem = self.local_filesystem if self.mode == MODES.LOCAL else self.remote_filesystem
+        filesystem = self.get_filesystem()
 
         tags = args.tags or []
         directories = args.directories or [filesystem.current]
@@ -116,8 +150,9 @@ class Interpreter(cmd.Cmd):
         for filename in filenames:
             self.print_file(filename)
 
-        for directory_name in directory_names:
-            self.print_directory(directory_name)
+        if not args.tags:
+            for directory_name in directory_names:
+                self.print_directory(directory_name)
 
     def print_file(self, file):
         print(file)
@@ -133,20 +168,14 @@ class Interpreter(cmd.Cmd):
     def help_cd(self):
         print("Change directory.")
         print("Usage: cd DIRECTORY")
-        print("Note: DIRECTORY can be either absolute or relative path.")
 
     def validate_cd(self, directory):
-        filesystem = self.local_filesystem if self.mode == MODES.LOCAL else self.remote_filesystem
-        new_directory = filesystem.format_path(directory)
-        if not filesystem.isdir(new_directory):
-            print(f"Path {directory} does not exist or is not a directory.")
-            return False
-        return True
+        filesystem = self.get_filesystem()
+        return self.validate_directory(directory, filesystem, should_exist=True)
 
     def cd(self, directory):
-        filesystem = self.local_filesystem if self.mode == MODES.LOCAL else self.remote_filesystem
-        new_directory = filesystem.format_path(directory)
-        filesystem.current = new_directory
+        filesystem = self.get_filesystem()
+        filesystem.current = directory
 
     def do_mkdir(self, directory):
         if self.validate_mkdir(directory):
@@ -155,53 +184,36 @@ class Interpreter(cmd.Cmd):
     def help_mkdir(self):
         print("Create directory.")
         print("Usage: mkdir DIRECTORY")
-        print("Note: DIRECTORY can be either absolute or relative path.")
 
     def validate_mkdir(self, directory):
-        filesystem = self.local_filesystem if self.mode == MODES.LOCAL else self.remote_filesystem
-        new_directory = filesystem.format_path(directory)
-        if filesystem.exists(new_directory):
-            print(f"Directory {directory} already exists.")
-            return False
-        return True
+        filesystem = self.get_filesystem()
+        parent = filesystem.parent(directory)
+        return self.validate_path(directory, filesystem, should_exist=False) and self.validate_path(parent, filesystem, should_exist=True)
 
     def mkdir(self, directory):
-        if self.mode == MODES.LOCAL:
-            os.mkdir(directory)
-        else:
-            directory_parent = utils.get_directory_parent(directory)
-            if directory_parent not in self.remote_folder_structure:
-                print(f"Parent directory {directory_parent} does not exist.")
-                return
-
-            parent_id = self.remote_folder_structure[directory_parent]
-            directory_name = directory.split('/')[-1]
-            self.api.create_directory(directory_name, parent_id)
-            self.remote_folder_structure = self.api.get_remote_folder_structure()
+        filesystem = self.get_filesystem()
+        filesystem.mkdir(directory)
 
     def do_rmdir(self, directory):
-        directory = utils.format_path(self.local_dir if self.mode == MODES.LOCAL else self.remote_dir, directory)
         if self.validate_rmdir(directory):
             self.rmdir(directory)
 
     def help_rmdir(self):
         print("Remove directory.")
         print("Usage: rmdir DIRECTORY")
-        print("Note: DIRECTORY can be either absolute or relative path.")
 
     def validate_rmdir(self, directory):
-        if not utils.path_exists(directory, self.mode, self.remote_folder_structure):
-            print(f"Directory {directory} does not exist.")
+        filesystem = self.get_filesystem()
+
+        if not filesystem.is_empty(directory):
+            print(f"Directory {directory} is not empty.")
             return False
-        return True
+
+        return self.validate_directory(directory, filesystem, should_exist=True)
 
     def rmdir(self, directory):
-        if self.mode == MODES.LOCAL:
-            shutil.rmtree(directory)
-        else:
-            directory_id = self.remote_folder_structure[directory]
-            self.api.delete_directory(directory_id)
-            self.remote_folder_structure = self.api.get_remote_folder_structure()
+        filesystem = self.get_filesystem()
+        filesystem.rmdir(directory)
 
     def do_tag(self, args):
         parser = argparse.ArgumentParser()

@@ -50,18 +50,24 @@ class LocalFileSystem(FileSystem):
         return os.path.exists(path)
 
     def listdir(self, path):
+        path = self.format_path(path)
         return os.listdir(path)
 
     def basename(self, path):
+        path = self.format_path(path)
         return os.path.basename(path)
 
     def isfile(self, path):
+        path = self.format_path(path)
         return os.path.isfile(path)
 
     def isdir(self, path):
+        path = self.format_path(path)
         return os.path.isdir(path)
 
     def children(self, path, files=True, directories=True, n=0):
+        path = self.format_path(path)
+
         children = []
         if files:
             children += [os.path.join(path, f) for f in os.listdir(path) if os.path.isfile(os.path.join(path, f))]
@@ -75,3 +81,11 @@ class LocalFileSystem(FileSystem):
     def exists(self, path):
         path = self.format_path(path)
         return os.path.exists(path)
+
+    def mkdir(self, path):
+        path = self.format_path(path)
+        os.mkdir(path)
+
+    def rmdir(self, path):
+        path = self.format_path(path)
+        os.rmdir(path)

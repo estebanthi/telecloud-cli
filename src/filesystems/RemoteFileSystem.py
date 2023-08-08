@@ -14,6 +14,11 @@ class RemoteFileSystem(FileSystem):
         self._directories_structure = self._api.get_remote_folder_structure() or {'/directory1': 'id5', '/directory2': 'id6'}
         self._full_structure = {**self._files_structure, **self._directories_structure}
 
+    def update_structure(self):
+        self._files_structure = self._api.get_remote_files_structure()
+        self._directories_structure = self._api.get_remote_folder_structure()
+        self._full_structure = {**self._files_structure, **self._directories_structure}
+
     def get_files(self, directories, regex=None, recursive=False, tags=None):
         directories = self.format_paths(directories)
 
@@ -53,22 +58,27 @@ class RemoteFileSystem(FileSystem):
         return path in self._files_structure or path in self._directories_structure
 
     def listdir(self, path):
-        path = self.format_path(path)
-        return [self.basename(path) for path in self._full_structure if self.parent(path) == path]
+        return [self.basename(self.format_path(path)) for path in self._full_structure if self.parent(path) == self.format_path(path)]
 
     def basename(self, path):
+        path = self.format_path(path)
         return path.split('/')[-1] if '/' in path else path
 
     def isfile(self, path):
+        path = self.format_path(path)
         return path in self._files_structure
 
     def isdir(self, path):
+        path = self.format_path(path)
         return path in self._directories_structure
 
     def parent(self, path):
+        path = self.format_path(path)
         return os.path.dirname(path)
 
     def children(self, path, files=True, directories=True, n=0):
+        path = self.format_path(path)
+
         children = []
         if files:
             children += [os.path.join(path, f) for f in self._files_structure if self.parent(f) == path]
@@ -79,3 +89,19 @@ class RemoteFileSystem(FileSystem):
                 children += self.children(child, files, directories, n-1)
         return children
 
+    def mkdir(self, path):
+        path = self.format_path(path)
+
+        parent = self.parent(path)
+        parent_id = self._directories_structure[parent]
+        directory_name = self.basename(path)
+
+        self._api.create_directory(directory_name, parent_id)
+        self.update_structure()
+
+    def rmdir(self, path):
+        path = self.format_path(path)
+
+        directory_id = self._directories_structure[path]
+        self._api.delete_directory(directory_id)
+        self.update_structure()

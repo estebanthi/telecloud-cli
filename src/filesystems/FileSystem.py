@@ -62,7 +62,21 @@ class FileSystem(ABC):
     def exists(self, path):
         pass
 
+    @abstractmethod
+    def mkdir(self, path):
+        pass
+
+    @abstractmethod
+    def rmdir(self, path):
+        pass
+
+    def is_empty(self, path):
+        path = self.format_path(path)
+        return len(self.children(path)) == 0
+
     def filter(self, paths, regex):
+        paths = self.format_paths(paths)
+
         filtered_paths = []
         for path in paths:
             basename = self.basename(path)
