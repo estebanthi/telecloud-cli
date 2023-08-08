@@ -118,6 +118,9 @@ class FileSystem(ABC):
     def filter(self, paths, regex):
         paths = self.format_paths(paths)
 
+        if not regex:
+            return paths
+
         filtered_paths = []
         for path in paths:
             basename = self.basename(path)

@@ -192,9 +192,7 @@ class Interpreter(cmd.Cmd):
         print("Usage: mkdir DIRECTORY")
 
     def validate_mkdir(self, directory):
-        filesystem = self.get_filesystem()
-        parent = filesystem.parent(directory)
-        return self.validate_path(directory, filesystem, should_exist=False) and self.validate_path(parent, filesystem, should_exist=True)
+        return self.validate_path(directory, should_exist=False)
 
     def mkdir(self, directory):
         filesystem = self.get_filesystem()
@@ -396,66 +394,76 @@ class Interpreter(cmd.Cmd):
         parser.add_argument('files', nargs='*', help='Files to be uploaded.')
         parser.add_argument('-to', '--to', help='Directory to upload the files to.')
         parser.add_argument('-d', '--directories', nargs='+', help='Directories to be uploaded.', default=[])
+        parser.add_argument('-r', '--recursive', action='store_true', help='Upload recursively.')
         parser.add_argument('-t', '--tags', nargs='+', help='Tags to be added to the files.', default=[])
-        parser.add_argument('-r', '--regex', help='Regex to filter files.')
+        parser.add_argument('-re', '--regex', help='Regex to filter files.')
         args = parser.parse_args(args.split())
 
         if self.validate_upload(args):
             self.upload(args)
 
     def help_upload(self):
-        print("Upload files.")
-        print("Usage: upload [OPTIONS] FILES")
-        print("Note: FILES are the files to be uploaded.")
+        print("Upload files to the remote server.")
+        print("Usage: upload [-to directory] [-d directories] [-r] [-t tags] [-re regex] [files]")
         print("Options:")
-        print("  -d, --directories TEXT  Directories to be uploaded.")
-        print("  -t, --tags TEXT         Tags to be added to the files.")
-        print("  -r, --regex TEXT        Regex to filter files.")
+        print("  -to, --to [directory] Directory to upload the files to.")
+        print("  -d, --directories      Directories to be uploaded.")
+        print("  -r, --recursive        Upload recursively.")
+        print("  -t, --tags             Tags to be added to the files.")
+        print("  -re, --regex [regex]   Filter by regex.")
 
     def validate_upload(self, args):
-        if args.directories:
-            args.directories = utils.format_paths(self.local_dir, args.directories)
-            for directory in args.directories:
-                if not utils.path_exists(directory, MODES.LOCAL, self.remote_folder_structure):
-                    print(f"Directory {directory} does not exist.")
-                    return False
-        if args.files:
-            args.files = utils.format_paths(self.local_dir, args.files)
-            for file in args.files:
-                if not utils.path_exists(file, MODES.LOCAL, self.remote_folder_structure):
-                    print(f"File {file} does not exist.")
-                    return False
-        if args.to:
-            args.to = utils.format_path(self.remote_dir, args.to)
-            if not utils.path_exists(args.to, MODES.REMOTE, self.remote_folder_structure):
-                print(f"Directory {args.to} does not exist in the remote.")
+        files = args.files or []
+        directories = args.directories or []
+        to = args.to or self.remote_filesystem.current
+
+        if not self.validate_files(files, should_exist=True, filesystem=self.local_filesystem):
+            return False
+
+        if not self.validate_directories(directories, should_exist=True, filesystem=self.local_filesystem):
+            return False
+
+        if not self.remote_filesystem.exists(to):
+            print("Directory '{}' does not exist.".format(args.to))
+            return False
+
+        for file in files:
+            if self.remote_filesystem.exists(os.path.join(to, os.path.basename(file))):
+                print("File '{}' already exists.".format(file))
                 return False
+
         return True
 
     def upload(self, args):
         directories = args.directories if args.directories else []
         files = args.files if args.files else []
-        to = self.remote_folder_structure[args.to if args.to else self.remote_dir]
+        to = args.to or self.remote_filesystem.current
         tags = args.tags
         regex = args.regex
+        recursive = args.recursive
 
-        directories = utils.format_paths(self.local_dir, directories)
-        files = utils.format_paths(self.local_dir, files)
+        files_from_dirs = self.local_filesystem.get_files(directories=directories, regex=regex, recursive=recursive)
+        paths_from_dirs = []
+        for file in files_from_dirs:
+            parent = None
+            for directory in directories:
+                if directory in file:
+                    parent = self.local_filesystem.format_path(directory)
+                    break
+            if parent:
+                path = self.local_filesystem.relative(file, parent)
+                paths_from_dirs.append(os.path.join(self.local_filesystem.basename(parent), path))
 
-        for directory in directories:
-            for root, dirs, files_ in os.walk(directory):
-                for file in files_:
-                    path = os.path.join(root, file)
-                    files.append(path)
+        paths_from_dirs = [os.path.join(to, path) for path in paths_from_dirs]
 
-        if regex:
-            files = [file for file in files if re.search(regex, file)]
+        files_from_files = self.local_filesystem.filter(files, regex=regex)
+        paths_from_files = [self.local_filesystem.basename(file) for file in files_from_files]
+        paths_from_files = [os.path.join(to, path) for path in paths_from_files]
 
-        for file in files:
-            self.api.upload(file, to, tags)
+        local_paths = files_from_dirs + files_from_files
+        remote_paths = paths_from_dirs + paths_from_files
 
-        self.remote_files_structure = self.api.get_remote_files_structure()
-        self.remote_folder_structure = self.api.get_remote_folder_structure()
+        self.remote_filesystem.upload(local_paths, remote_paths, tags, regex)
 
     def do_download(self, args):
         parser = argparse.ArgumentParser()

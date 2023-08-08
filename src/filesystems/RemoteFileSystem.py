@@ -98,6 +98,10 @@ class RemoteFileSystem(FileSystem):
         path = self.format_path(path)
 
         parent = self.parent(path)
+
+        if not self.isdir(parent):
+            self.mkdir(parent)
+
         parent_id = self._directories_structure[parent]
         directory_name = self.basename(path)
 
@@ -145,7 +149,7 @@ class RemoteFileSystem(FileSystem):
         if directories:
             files += self.get_files(directories, regex=regex, recursive=recursive)
 
-        self.filter(files, regex) if regex else None
+        files = self.filter(files, regex)
 
         files_ids = [self._files_structure[file] for file in files]
         for file_id in files_ids:
@@ -158,8 +162,23 @@ class RemoteFileSystem(FileSystem):
         if directories:
             files += self.get_files(directories, regex=regex, recursive=recursive)
 
-        self.filter(files, regex) if regex else None
+        files = self.filter(files, regex)
 
         files_ids = [self._files_structure[file] for file in files]
         for file_id in files_ids:
             self._api.remove_tags(file_id, tags)
+
+    def upload(self, local_paths, remote_paths, tags, regex):
+        files = self.format_paths(remote_paths)
+
+        for path in files:
+            parent = self.parent(path)
+            if not self.isdir(parent):
+                self.mkdir(parent)
+
+        for index, file in enumerate(remote_paths):
+            to = self.parent(file)
+            to = self._directories_structure[to]
+            self._api.upload(local_paths[index], to, tags)
+
+        self.update_structure()
