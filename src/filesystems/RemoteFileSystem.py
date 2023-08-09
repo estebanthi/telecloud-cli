@@ -136,3 +136,9 @@ class RemoteFileSystem(FileSystem):
         to = self._directories_structure[to]
 
         self._api.upload(local_path, to, tags)
+
+    def _download_file(self, remote_path, local_path):
+        to = self.parent(local_path)
+        id_ = self._files_structure[remote_path]
+
+        self._api.download(id_, to)

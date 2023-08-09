@@ -265,3 +265,23 @@ class FileSystem(ABC):
 
     def _upload_file(self, local_path, remote_path):
         pass
+
+    def download(self, remote_paths, local_paths):
+        files = self.format_paths(remote_paths)
+
+        for path in files:
+            parent = self.parent(path)
+            if not self.isdir(parent):
+                self.mkdir(parent)
+
+        for index, file in enumerate(local_paths):
+            remote_path = remote_paths[index]
+            local_path = file
+            self.download_file(remote_path, local_path)
+
+    def download_file(self, remote_path, local_path):
+        self.logger.info(f"Downloading {remote_path} to {local_path}")
+        self._download_file(remote_path, local_path)
+
+    def _download_file(self, remote_path, local_path):
+        pass
