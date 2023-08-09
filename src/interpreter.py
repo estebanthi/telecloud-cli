@@ -60,7 +60,7 @@ class Interpreter(cmd.Cmd):
         return self.local_filesystem if self.mode == MODES.LOCAL else self.remote_filesystem
 
     def run(self):
-        self.cmdloop('\n' + colors.light_theme("Welcome to Telecloud CLI!", randomize=True) + '\n' + 'Type help or ? to list commands.\n')
+        self.cmdloop('\n' + colors.rainbow("Welcome to Telecloud CLI!", randomize=True) + '\n' + 'Type help or ? to list commands.\n')
 
     def do_exit(self, args):
         return -1
