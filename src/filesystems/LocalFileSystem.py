@@ -10,9 +10,18 @@ class LocalFileSystem(FileSystem):
     def __init__(self, root_path=os.path.expanduser("~")):
         super().__init__(root_path)
 
-    def listdir(self, path):
+    def listdir(self, path, files=True, directories=True):
         path = self.format_path(path)
-        return os.listdir(path)
+
+        list_paths = os.listdir(path)
+        if files and not directories:
+            return [path_ for path_ in list_paths if self.isfile(os.path.join(path, path_))]
+
+        elif directories and not files:
+            return [path_ for path_ in list_paths if self.isdir(os.path.join(path, path_))]
+
+        return list_paths
+
 
     def _create_directory(self, path):
         os.mkdir(path)
