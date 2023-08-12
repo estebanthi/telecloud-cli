@@ -51,6 +51,11 @@ class Api:
         res = requests.post(f"{self.api_url}/files/{file_id}/meta/tags", data={"tags": tags})
         return res.status_code == 200
 
+    def get_tags(self, file_id):
+        res = requests.get(f"{self.api_url}/files/{file_id}/meta")
+        json = res.json()
+        return json["tags"] if res.status_code == 200 and "tags" in json else []
+
     def remove_tags(self, file_id, tags):
         res = requests.patch(f"{self.api_url}/files/{file_id}/meta/tags", data={"tags": tags})
         return res.status_code == 200

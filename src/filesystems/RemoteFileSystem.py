@@ -58,7 +58,7 @@ class RemoteFileSystem(FileSystem):
             self._api.move(src_id, dst_id)
 
 
-        self.update_structure()
+        self.update()
 
     def _remove_file(self, path):
         file_id = self._files_structure[path]
@@ -126,6 +126,10 @@ class RemoteFileSystem(FileSystem):
     def _tag_path(self, path, tags):
         file_id = self._files_structure[path]
         self._api.add_tags(file_id, tags)
+
+    def _get_tags_path(self, path):
+        file_id = self._files_structure[path]
+        return self._api.get_tags(file_id)
 
     def _untag_path(self, path, tags):
         file_id = self._files_structure[path]

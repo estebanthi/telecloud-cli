@@ -225,6 +225,28 @@ class FileSystem(ABC):
     def _tag_path(self):
         pass
 
+    def get_tags(self, files, directories, regex, recursive):
+        files = self.format_paths(files)
+        directories = self.format_paths(directories)
+
+        if directories:
+            files += self.get_files(directories, regex=regex, recursive=recursive)
+
+        files = self.filter(files, regex)
+
+        to_return = []
+        for file in files:
+            tags = self.get_tags_path(file)
+            to_return.append((file, tags))
+        return to_return
+
+    def get_tags_path(self, path):
+        self.logger.info(f"Getting tags for {path}")
+        return self._get_tags_path(path)
+
+    def _get_tags_path(self, path):
+        pass
+
     def untag(self, files, directories, tags, regex, recursive):
         files = self.format_paths(files)
         directories = self.format_paths(directories)

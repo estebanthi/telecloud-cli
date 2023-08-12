@@ -336,11 +336,12 @@ class Interpreter(cmd.Cmd):
 
     def do_tag(self, args):
         parser = argparse.ArgumentParser()
-        parser.add_argument('tags', nargs='+', help='Tags to be added to the file.', default=[])
+        parser.add_argument('tags', nargs='*', help='Tags to be added to the file.', default=[])
         parser.add_argument('-re', '--regex', help='Regex to filter files.')
         parser.add_argument('-r', '--recursive', action='store_true', help='Tag recursively.')
         parser.add_argument('-d', '--directories', nargs='+', help='Directories to tag.', default=[])
         parser.add_argument('-f', '--files', nargs='+', help='Files to tag.', default=[])
+        parser.add_argument('-s', '--show', action='store_true', help='Show tags.')
         args = parser.parse_args(args.split())
 
         if self.validate_tag(args):
@@ -354,6 +355,7 @@ class Interpreter(cmd.Cmd):
         print("  -r, --recursive      Tag recursively.")
         print("  -d, --directories    Directories to tag.")
         print("  -f, --files          Files to tag.")
+        print("  -s, --show           Show tags.")
 
     def validate_tag(self, args):
         files = args.files or []
@@ -374,8 +376,24 @@ class Interpreter(cmd.Cmd):
         tags = args.tags
         regex = args.regex
         recursive = args.recursive
+        show = args.show
 
-        filesystem.tag(files, directories, tags, regex, recursive)
+        if tags:
+            filesystem.tag(files, directories, tags, regex, recursive)
+
+        if show:
+            if not files and not directories:
+                directories = [filesystem.current]
+
+            to_print = filesystem.get_tags(files, directories, regex, recursive)
+            for file in to_print:
+                path = filesystem.relative(file[0], filesystem.current)
+
+                tags_color = 'yellow'
+                tags = [colored(f"#{tag}", tags_color) for tag in file[1]]
+                tags_str = ', '.join(tags)
+
+                print(f"{path}: {colored(tags_str, 'yellow')}")
 
     def do_untag(self, args):
         parser = argparse.ArgumentParser()
@@ -487,6 +505,16 @@ class Interpreter(cmd.Cmd):
 
         if self.validate_download(args):
             self.download(args)
+
+    def help_download(self):
+        print("Download files from the remote server.")
+        print("Usage: download [-to directory] [-d directories] [-r] [-re regex] [-t tags] [files]")
+        print("Options:")
+        print("  -to, --to [directory] Directory to download the files to.")
+        print("  -d, --directories      Directories to be downloaded.")
+        print("  -r, --recursive        Download recursively.")
+        print("  -re, --regex [regex]   Filter by regex.")
+        print("  -t, --tags             Filter by tags.")
 
     def validate_download(self, args):
         files = args.files or []
