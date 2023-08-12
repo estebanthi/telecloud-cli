@@ -1,6 +1,6 @@
 from yaml import safe_load
 
-from src.interpreter import Interpreter
+from src.interpreter.interpreter import Interpreter
 from src.logger import Logger
 
 

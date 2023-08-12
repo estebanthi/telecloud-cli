@@ -31,7 +31,7 @@ class FileSystem(ABC):
         pass
 
     @abstractmethod
-    def listdir(self, path):
+    def listdir(self, path, files=True, directories=True):
         pass
 
     def mkdir(self, path):

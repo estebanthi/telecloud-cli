@@ -26,9 +26,18 @@ class RemoteFileSystem(FileSystem):
         self._directories_structure = self._api.get_remote_folder_structure()
         self._full_structure = {**self._files_structure, **self._directories_structure}
 
-    def listdir(self, path):
-        return [self.basename(self.format_path(path_)) for path_ in self._full_structure
-                if self.parent(path_) == self.format_path(path)]
+    def listdir(self, path, files=True, directories=True):
+        path = self.format_path(path)
+        structure = self._full_structure
+
+        if files and not directories:
+            structure = self._files_structure
+
+        elif directories and not files:
+            structure = self._directories_structure
+
+        return [self.basename(self.format_path(path_)) for path_ in structure
+                if self.parent(path_) == self.format_path(path) and path_ != '']
 
     def _create_directory(self, path):
         parent = self.parent(path)

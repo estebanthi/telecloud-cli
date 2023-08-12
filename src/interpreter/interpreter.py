@@ -2,13 +2,13 @@ import cmd
 import argparse
 from termcolor import colored
 import os
-import re
 import logging
 
-from src.modes import MODES
+from src.interpreter.modes import MODES
 from src.api import Api
 from src.filesystems import LocalFileSystem, RemoteFileSystem, FileSystemConnector
-import src.colors as colors
+import src.interpreter.colors as colors
+from src.interpreter.complete_parser import CompleteParser
 
 
 class Interpreter(cmd.Cmd):
@@ -169,6 +169,13 @@ class Interpreter(cmd.Cmd):
         print("  -re, --regex [regex] Filter by regex.")
         print("  -r, --recursive      List recursively.")
 
+    def complete_ls(self, text, line, begidx, endidx):
+        last_arg_name, last_arg_value = CompleteParser.parse_line(line)
+
+        if not last_arg_name:
+            filesystem = self.get_filesystem()
+            return [directory for directory in filesystem.listdir(filesystem.current, files=False) if directory.startswith(text)]
+
     def ls(self, args):
         filesystem = self.get_filesystem()
 
@@ -205,6 +212,10 @@ class Interpreter(cmd.Cmd):
         print("Change directory.")
         print("Usage: cd DIRECTORY")
 
+    def complete_cd(self, text, line, begidx, endidx):
+        filesystem = self.get_filesystem()
+        return [directory for directory in filesystem.listdir(filesystem.current, files=False) if directory.startswith(text)]
+
     def validate_cd(self, directory):
         filesystem = self.get_filesystem()
         return self.validate_directory(directory, filesystem, should_exist=True)
@@ -236,6 +247,10 @@ class Interpreter(cmd.Cmd):
         print("Remove directory.")
         print("Usage: rmdir DIRECTORY")
 
+    def complete_rmdir(self, text, line, begidx, endidx):
+        filesystem = self.get_filesystem()
+        return [directory for directory in filesystem.listdir(filesystem.current, files=False) if directory.startswith(text)]
+
     def validate_rmdir(self, directory):
         filesystem = self.get_filesystem()
 
@@ -266,6 +281,15 @@ class Interpreter(cmd.Cmd):
         print("Options:")
         print("  -r, --recursive      Remove recursively.")
         print("  -re, --regex [regex] Filter by regex.")
+
+    def complete_rm(self, text, line, begidx, endidx):
+        filesystem = self.get_filesystem()
+        last_arg_name, last_arg_value = CompleteParser.parse_line(line)
+
+        if not last_arg_name and last_arg_name not in ['-r', '--recursive']:
+            return [file for file in filesystem.listdir(filesystem.current, files=True) if file.startswith(text)]
+        if not last_arg_name and last_arg_name in ['-r', '--recursive']:
+            return [path for path in filesystem.listdir(filesystem.current) if path.startswith(text)]
 
     def validate_rm(self, args):
         filesystem = self.get_filesystem()
@@ -299,6 +323,13 @@ class Interpreter(cmd.Cmd):
     def help_mv(self):
         print("Move a file.")
         print("Usage: mv OLD NEW")
+
+    def complete_mv(self, text, line, begidx, endidx):
+        filesystem = self.get_filesystem()
+        last_arg_name, last_arg_value = CompleteParser.parse_line(line)
+
+        if not last_arg_name:
+            return [path for path in filesystem.listdir(filesystem.current) if path.startswith(text)]
 
     def validate_mv(self, args):
         filesystem = self.get_filesystem()
@@ -356,6 +387,17 @@ class Interpreter(cmd.Cmd):
         print("  -d, --directories    Directories to tag.")
         print("  -f, --files          Files to tag.")
         print("  -s, --show           Show tags.")
+
+    def complete_tag(self, text, line, begidx, endidx):
+        filesystem = self.get_filesystem()
+        last_arg_name, last_arg_value = CompleteParser.parse_line(line)
+
+        if last_arg_name in ['-d', '--directories']:
+            return [path for path in filesystem.listdir(filesystem.current, files=False) if path.startswith(last_arg_value)]
+        elif last_arg_name in ['-f', '--files']:
+            return [file for file in filesystem.listdir(filesystem.current, directories=False) if file.startswith(last_arg_value)]
+        elif last_arg_name in ['-s', '--show']:
+            return [path for path in filesystem.listdir(filesystem.current, directories=False) if path.startswith(last_arg_value)]
 
     def validate_tag(self, args):
         files = args.files or []
@@ -416,6 +458,15 @@ class Interpreter(cmd.Cmd):
         print("  -d, --directories    Directories to untag.")
         print("  -f, --files          Files to untag.")
 
+    def complete_untag(self, text, line, begidx, endidx):
+        filesystem = self.get_filesystem()
+        last_arg_name, last_arg_value = CompleteParser.parse_line(line)
+
+        if last_arg_name in ['-d', '--directories']:
+            return [path for path in filesystem.listdir(filesystem.current, files=False) if path.startswith(last_arg_value)]
+        elif last_arg_name in ['-f', '--files']:
+            return [file for file in filesystem.listdir(filesystem.current, directories=False) if file.startswith(last_arg_value)]
+
     def validate_untag(self, args):
         files = args.files or []
         directories = args.directories or []
@@ -459,6 +510,22 @@ class Interpreter(cmd.Cmd):
         print("  -r, --recursive        Upload recursively.")
         print("  -t, --tags             Tags to be added to the files.")
         print("  -re, --regex [regex]   Filter by regex.")
+
+    def complete_upload(self, text, line, begidx, endidx):
+        last_arg_name, last_arg_value = CompleteParser.parse_line(line)
+
+        if not last_arg_name:
+            local_paths = self.local_filesystem.listdir(self.local_filesystem.current, directories=False)
+            return [path for path in local_paths if path.startswith(last_arg_value)]
+
+        if last_arg_name in ['-to', '--to']:
+            remote_paths = self.remote_filesystem.listdir(self.remote_filesystem.current, files=False)
+            return [path for path in remote_paths if path.startswith(last_arg_value)]
+
+        if last_arg_name in ['-d', '--directories']:
+            local_paths = self.local_filesystem.listdir(self.local_filesystem.current, files=False)
+            return [path for path in local_paths if path.startswith(last_arg_value)]
+
 
     def validate_upload(self, args):
         files = args.files or []
@@ -548,3 +615,19 @@ class Interpreter(cmd.Cmd):
 
         filesystem_connector = FileSystemConnector(self.local_filesystem, self.remote_filesystem)
         filesystem_connector.download(files, directories, to, tags, regex, recursive)
+
+    def complete_download(self, text, line, begidx, endidx):
+        last_arg_name, last_arg_value = CompleteParser.parse_line(line)
+        print(last_arg_name, last_arg_value)
+
+        if not last_arg_name:
+            remote_paths = self.remote_filesystem.listdir(self.remote_filesystem.current, directories=False)
+            return [path for path in remote_paths if path.startswith(last_arg_value)]
+
+        if last_arg_name in ['-to', '--to']:
+            local_paths = self.local_filesystem.listdir(self.local_filesystem.current, files=False)
+            return [path for path in local_paths if path.startswith(last_arg_value)]
+
+        if last_arg_name in ['-d', '--directories']:
+            remote_paths = self.remote_filesystem.listdir(self.remote_filesystem.current, files=False)
+            return [path for path in remote_paths if path.startswith(last_arg_value)]
