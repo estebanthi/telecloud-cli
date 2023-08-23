@@ -630,3 +630,39 @@ class Interpreter(cmd.Cmd):
         if last_arg_name in ['-d', '--directories']:
             remote_paths = self.remote_filesystem.listdir(self.remote_filesystem.current, files=False)
             return [path for path in remote_paths if path.startswith(last_arg_value)]
+
+    def do_clear(self, args):
+        self.remote_filesystem.clear()
+
+    def do_normalize(self, args):
+        parser = argparse.ArgumentParser()
+        parser.add_argument('files', nargs='*', help='Files to be normalized.')
+        parser.add_argument('-d', '--directories', nargs='+', help='Directories to be normalized.', default=[])
+        parser.add_argument('-r', '--recursive', action='store_true', help='Normalize recursively.')
+        parser.add_argument('-re', '--regex', help='Regex to filter files.')
+        parser.add_argument('-t', '--tags', nargs='+', help='Filter by tags.')
+        args = parser.parse_args(args.split())
+
+        if self.validate_normalize(args):
+            self.normalize(args)
+
+    def help_normalize(self):
+        print("Normalize files.")
+        print("Usage: normalize [-d directories] [-r] [-re regex] [-t tags] [files]")
+        print("Options:")
+        print("  -d, --directories      Directories to be normalized.")
+        print("  -r, --recursive        Normalize recursively.")
+        print("  -re, --regex [regex]   Filter by regex.")
+        print("  -t, --tags             Filter by tags.")
+
+    def validate_normalize(self, args):
+        files = args.files or []
+        directories = args.directories or []
+
+        if not self.validate_files(files, should_exist=True, filesystem=self.remote_filesystem):
+            return False
+
+        if not self.validate_directories(directories, should_exist=True, filesystem=self.remote_filesystem):
+            return False
+
+        return True

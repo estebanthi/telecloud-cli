@@ -307,3 +307,7 @@ class FileSystem(ABC):
 
     def _download_file(self, remote_path, local_path):
         pass
+
+    def clear(self):
+        self.logger.info(f"Clearing {self.root}")
+        self._clear()

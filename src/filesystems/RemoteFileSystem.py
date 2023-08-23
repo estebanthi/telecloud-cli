@@ -155,3 +155,14 @@ class RemoteFileSystem(FileSystem):
         id_ = self._files_structure[remote_path]
 
         self._api.download(id_, to)
+
+    def _clear(self):
+        files = self._files_structure.keys()
+        for file in files:
+            self._remove_file(file)
+
+        directories = self._directories_structure.keys()
+        for directory in directories:
+            self._remove_directory(directory)
+
+        self._update()
